@@ -11,6 +11,7 @@ import 'package:tour_mobile/widgets/city_glass_card.dart';
 import 'package:tour_mobile/widgets/explore_cities_tabs.dart';
 import 'package:tour_mobile/profile/user_session_store.dart';
 import 'package:tour_mobile/widgets/home_user_greeting.dart';
+import 'package:tour_mobile/screens/place_search_screen.dart';
 import 'package:tour_mobile/widgets/travel_search_field.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -195,10 +196,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 22)),
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 22),
-                  child: TravelSearchField(),
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: TravelSearchField(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => const PlaceSearchScreen()),
+                      );
+                    },
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 26)),

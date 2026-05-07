@@ -24,7 +24,7 @@ class TravelSearchField extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Discover a city',
+                  'Discover places',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: TravelColors.muted,
                         fontWeight: FontWeight.w400,
