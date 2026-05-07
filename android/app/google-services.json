@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1053627493780",
+    "project_id": "my-trek-guide-253c2",
+    "storage_bucket": "my-trek-guide-253c2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1053627493780:android:c661c3e987ea1f048e3381",
+        "android_client_info": {
+          "package_name": "com.mytrekguide.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZ3_JMWRiKdf2-rA3pnCIuGQtZG4CyfuA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
