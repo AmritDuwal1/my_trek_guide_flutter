@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:tour_mobile/models/nepal_place.dart';
-import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/screens/map/in_app_route_navigation_screen.dart';
+import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 import 'package:tour_mobile/widgets/api_offline_block.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -16,10 +16,10 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  static const _everestBaseCampTrekId = 'everest-base-camp-trek';
-
   final _service = ItineraryService();
   late Future<List<NepalPlace>> _future;
+  final _mapController = MapController();
+  double _zoom = 6.6;
 
   @override
   void initState() {
@@ -34,80 +34,101 @@ class _MapScreenState extends State<MapScreen> {
     await _future;
   }
 
-  /// Google Maps cannot route the Khumbu foot trail; for EBC we pass our geocoded
-  /// corridor as walking origin / waypoints / destination (approximate).
-  Uri _everestClassicWalkingUri(List<NepalRoutePoint> path) {
-    final origin = path.first;
-    final dest = path.last;
-    final middle = path.sublist(1, path.length - 1);
-    final sampled = _evenSampleMiddleWaypoints(middle, 10);
-    final q = <String, String>{
-      'api': '1',
-      'travelmode': 'walking',
-      'origin': '${origin.lat},${origin.lng}',
-      'destination': '${dest.lat},${dest.lng}',
-    };
-    if (sampled.isNotEmpty) {
-      q['waypoints'] = sampled.map((p) => '${p.lat},${p.lng}').join('|');
+  ({Color color, IconData icon}) _styleForPlace(NepalPlace p) {
+    final t = p.type.trim().toLowerCase();
+    if (t == 'trek') {
+      return (color: TravelColors.accent, icon: Icons.hiking_rounded);
     }
-    return Uri.https('www.google.com', '/maps/dir/', q);
+    if (t.contains('hotel') || t.contains('lodge') || t.contains('guest')) {
+      return (color: const Color(0xFF7C4DFF), icon: Icons.hotel_rounded);
+    }
+    if (t.contains('waterfall') || t.contains('falls')) {
+      return (color: const Color(0xFF1E88E5), icon: Icons.waterfall_chart_rounded);
+    }
+    if (t.contains('lake')) {
+      return (color: const Color(0xFF00ACC1), icon: Icons.water_rounded);
+    }
+    if (t.contains('temple') || t.contains('monastery') || t.contains('stupa')) {
+      return (color: const Color(0xFFFB8C00), icon: Icons.temple_buddhist_rounded);
+    }
+    if (t.contains('view') || t.contains('peak') || t.contains('summit')) {
+      return (color: const Color(0xFF546E7A), icon: Icons.landscape_rounded);
+    }
+    return (color: TravelColors.navActive, icon: Icons.place_rounded);
   }
 
-  List<NepalRoutePoint> _evenSampleMiddleWaypoints(List<NepalRoutePoint> pts, int max) {
-    if (pts.isEmpty || max <= 0) return [];
-    if (pts.length <= max) return pts;
-    final out = <NepalRoutePoint>[];
-    for (var i = 0; i < max; i++) {
-      final idx = ((i / (max - 1)) * (pts.length - 1)).round();
-      out.add(pts[idx]);
-    }
-    final deduped = <NepalRoutePoint>[];
-    NepalRoutePoint? prev;
-    for (final p in out) {
-      if (prev != null && prev.lat == p.lat && prev.lng == p.lng) continue;
-      deduped.add(p);
-      prev = p;
-    }
-    return deduped;
-  }
+  Marker _placeMarker({
+    required NepalPlace place,
+    required bool showLabel,
+    double size = 42,
+  }) {
+    final style = _styleForPlace(place);
+    final point = LatLng(place.lat, place.lng);
 
-  Uri _mapsDirectionsUri(NepalPlace place) {
-    if (place.id == _everestBaseCampTrekId &&
-        place.routePath != null &&
-        place.routePath!.length >= 2) {
-      return _everestClassicWalkingUri(place.routePath!);
+    Widget pin = DecoratedBox(
+      decoration: BoxDecoration(
+        color: style.color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Icon(style.icon, color: Colors.white, size: size * 0.52),
+        ),
+      ),
+    );
+
+    if (showLabel) {
+      pin = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          pin,
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: TravelColors.line),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                place.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: TravelColors.ink),
+              ),
+            ),
+          ),
+        ],
+      );
     }
 
-    late final double destLat;
-    late final double destLng;
-    if (place.type == 'Trek') {
-      if (place.vehicleLat != null && place.vehicleLng != null) {
-        destLat = place.vehicleLat!;
-        destLng = place.vehicleLng!;
-      } else if (place.routePath != null && place.routePath!.isNotEmpty) {
-        destLat = place.routePath!.first.lat;
-        destLng = place.routePath!.first.lng;
-      } else {
-        destLat = place.lat;
-        destLng = place.lng;
-      }
-    } else {
-      destLat = place.lat;
-      destLng = place.lng;
-    }
-
-    return Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'destination': '$destLat,$destLng',
-      'travelmode': 'driving',
-    });
-  }
-
-  Future<void> _navigateTo(NepalPlace place) async {
-    final uri = _mapsDirectionsUri(place);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw Exception('Could not open maps app');
-    }
+    return Marker(
+      point: point,
+      width: showLabel ? 180 : size,
+      height: showLabel ? (size + 34) : size,
+      alignment: Alignment.topCenter,
+      child: GestureDetector(
+        onTap: () => _showPlaceSheet(place),
+        child: pin,
+      ),
+    );
   }
 
   void _showPlaceSheet(NepalPlace place) {
@@ -157,29 +178,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 child: const Text('Navigate in app'),
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () async {
-                    nav.pop();
-                    await _navigateTo(place);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: TravelColors.ink,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    side: const BorderSide(color: TravelColors.line),
-                  ),
-                  child: Text(
-                    place.id == _everestBaseCampTrekId
-                        ? 'Google Maps — walking EBC (approx.)'
-                        : place.type == 'Trek'
-                            ? 'Google Maps — trailhead'
-                            : 'Google Maps — directions',
-                  ),
-                ),
-              ),
             ],
           ),
         );
@@ -207,37 +205,11 @@ class _MapScreenState extends State<MapScreen> {
 
           final center = const LatLng(28.3949, 84.1240); // Nepal centroid-ish
 
-          final markers = places.map((p) {
-            final isTrek = p.type == 'Trek';
-            final color = isTrek ? TravelColors.accent : TravelColors.navActive;
-            return Marker(
-              point: LatLng(p.lat, p.lng),
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              child: GestureDetector(
-                onTap: () => _showPlaceSheet(p),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    isTrek ? Icons.hiking_rounded : Icons.place_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-            );
-          }).toList();
+          // Show names on the map (still clustered when zoomed out).
+          final showLabel = _zoom >= 8.5;
+          final markers = <Marker>[
+            for (final p in places) _placeMarker(place: p, showLabel: showLabel),
+          ];
 
           final polylines = <Polyline<Object>>[
             for (final p in places)
@@ -252,10 +224,17 @@ class _MapScreenState extends State<MapScreen> {
           return Stack(
             children: [
               FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
                   initialCenter: center,
                   initialZoom: 6.6,
                   interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                  onPositionChanged: (pos, _) {
+                    final z = pos.zoom;
+                    if ((z - _zoom).abs() >= 0.05) {
+                      setState(() => _zoom = z);
+                    }
+                  },
                 ),
                 children: [
                   TileLayer(
@@ -263,7 +242,39 @@ class _MapScreenState extends State<MapScreen> {
                     userAgentPackageName: 'com.tour.tour_mobile',
                   ),
                   if (polylines.isNotEmpty) PolylineLayer(polylines: polylines),
-                  MarkerLayer(markers: markers),
+                  MarkerClusterLayerWidget(
+                    options: MarkerClusterLayerOptions(
+                      markers: markers,
+                      maxClusterRadius: 55,
+                      size: const Size(44, 44),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.all(50),
+                      disableClusteringAtZoom: 14,
+                      showPolygon: false,
+                      builder: (context, clustered) {
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: TravelColors.navActive.withValues(alpha: 0.92),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${clustered.length}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
               Positioned(
