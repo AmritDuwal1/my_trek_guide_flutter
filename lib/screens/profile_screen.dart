@@ -8,6 +8,47 @@ import 'package:tour_mobile/theme/travel_theme.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<void> _confirmDeleteAccount(BuildContext context, AuthService auth) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete account?'),
+          content: const Text(
+            'This will permanently delete your account and your saved data on this device and our server. This cannot be undone.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: TravelColors.navActive)),
+    );
+    try {
+      await auth.deleteAccount();
+      if (context.mounted) {
+        Navigator.of(context).pop(); // progress
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deleted.')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // progress
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = AuthService();
@@ -100,6 +141,15 @@ class ProfileScreen extends StatelessWidget {
             label: 'Logout',
             onTap: () async => auth.signOut(),
           ),
+          if (user != null) ...[
+            const SizedBox(height: 6),
+            _ProfileRow(
+              icon: Icons.delete_forever_rounded,
+              label: 'Delete account',
+              onTap: () => _confirmDeleteAccount(context, auth),
+              danger: true,
+            ),
+          ],
         ],
       ),
     );
@@ -107,11 +157,12 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _ProfileRow extends StatelessWidget {
-  const _ProfileRow({required this.icon, required this.label, this.onTap});
+  const _ProfileRow({required this.icon, required this.label, this.onTap, this.danger = false});
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
@@ -122,8 +173,11 @@ class _ProfileRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: ListTile(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          leading: Icon(icon, color: TravelColors.primary),
-          title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          leading: Icon(icon, color: danger ? Colors.red.shade700 : TravelColors.primary),
+          title: Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.w600, color: danger ? Colors.red.shade700 : null),
+          ),
           trailing: const Icon(Icons.chevron_right_rounded, color: TravelColors.muted),
           onTap: onTap ?? () {},
         ),

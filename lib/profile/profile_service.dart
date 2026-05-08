@@ -65,6 +65,30 @@ class ProfileService {
     }
   }
 
+  Future<void> deleteMyProfile() async {
+    final res = await _client.delete(
+      _uri('/profile/'),
+      headers: {
+        ...await _authHeaders(),
+      },
+    );
+    if (res.statusCode == 401) {
+      throw Exception('Unauthorized (sign in again)');
+    }
+    if (res.statusCode != 200) {
+      throw Exception('Failed to delete profile (${res.statusCode})');
+    }
+  }
+
+  Future<void> deleteProfilePhoto({required String uid}) async {
+    final ref = _storage.ref('users/$uid/profile.jpg');
+    try {
+      await ref.delete();
+    } catch (_) {
+      // ignore if missing
+    }
+  }
+
   Future<String> uploadProfilePhoto({
     required String uid,
     required File file,

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:tour_mobile/profile/profile_service.dart';
 import 'package:tour_mobile/config/api_config.dart';
 import 'package:tour_mobile/profile/user_session_store.dart';
 import 'package:tour_mobile/services/logging_http_client.dart';
@@ -93,6 +94,70 @@ class AuthService {
   Future<void> signOut() async {
     await UserSessionStore.clear();
     await _auth.signOut();
+  }
+
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No signed-in user');
+    }
+
+    // 1) Delete app data (API profile + favorites, plus profile photo in Storage).
+    final profile = ProfileService();
+    try {
+      await profile.deleteMyProfile();
+    } catch (_) {
+      // Best-effort: continue so user can still delete their auth account.
+    }
+    await profile.deleteProfilePhoto(uid: user.uid);
+
+    // 2) Delete Firebase Auth user (may require recent login).
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        await _reauthenticate(user);
+        await user.delete();
+      } else {
+        rethrow;
+      }
+    }
+
+    await UserSessionStore.clear();
+  }
+
+  Future<void> _reauthenticate(User user) async {
+    final providers = user.providerData.map((p) => p.providerId).toSet();
+
+    if (providers.contains('google.com')) {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) throw Exception('Google re-auth cancelled');
+      final googleAuth = await googleUser.authentication;
+      final cred = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await user.reauthenticateWithCredential(cred);
+      return;
+    }
+
+    if (providers.contains('apple.com')) {
+      final result = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      );
+      final cred = OAuthProvider('apple.com').credential(
+        idToken: result.identityToken,
+        accessToken: result.authorizationCode,
+      );
+      await user.reauthenticateWithCredential(cred);
+      return;
+    }
+
+    if (providers.contains('password')) {
+      throw Exception('Please sign in again (email/password) then retry deleting the account.');
+    }
+
+    throw Exception('Please sign in again then retry deleting the account.');
   }
 }
 
