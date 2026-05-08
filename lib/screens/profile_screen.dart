@@ -3,6 +3,8 @@ import 'package:tour_mobile/auth/auth_service.dart';
 import 'package:tour_mobile/profile/profile_service.dart';
 import 'package:tour_mobile/profile/user_profile.dart';
 import 'package:tour_mobile/screens/profile/edit_profile_screen.dart';
+import 'package:tour_mobile/screens/support/help_complaints_screen.dart';
+import 'package:tour_mobile/screens/support/reviews_ratings_screen.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -134,7 +136,24 @@ class ProfileScreen extends StatelessWidget {
             ),
           // _ProfileRow(icon: Icons.bookmark_outline_rounded, label: 'Saved places'),
           _ProfileRow(icon: Icons.settings_outlined, label: 'Settings'),
-          _ProfileRow(icon: Icons.help_outline_rounded, label: 'Help'),
+          _ProfileRow(
+            icon: Icons.support_agent_rounded,
+            label: 'Help & Complaints',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const HelpComplaintsScreen()),
+              );
+            },
+          ),
+          _ProfileRow(
+            icon: Icons.star_rate_rounded,
+            label: 'Reviews & Ratings',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ReviewsRatingsScreen()),
+              );
+            },
+          ),
           const SizedBox(height: 6),
           _ProfileRow(
             icon: Icons.logout_rounded,
