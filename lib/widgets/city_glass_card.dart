@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:tour_mobile/models/itinerary.dart';
 import 'package:tour_mobile/theme/cover_image.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
+import 'package:tour_mobile/widgets/network_image_fallback.dart';
 
 /// Large portrait city card with frosted bottom overlay (reference home screen).
 class CityGlassCard extends StatelessWidget {
@@ -44,9 +45,13 @@ class CityGlassCard extends StatelessWidget {
                 Image.network(
                   itineraryCoverUrl(itinerary.id),
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => ColoredBox(
+                  errorBuilder: (_, __, ___) => NetworkImageWithFallback(
+                    urls: itineraryCoverUrls(itinerary.id),
+                    fit: BoxFit.cover,
+                    placeholder: ColoredBox(
                     color: TravelColors.navActive.withValues(alpha: 0.25),
                     child: const Icon(Icons.landscape_rounded, size: 48, color: Colors.white70),
+                    ),
                   ),
                 ),
                 Positioned(

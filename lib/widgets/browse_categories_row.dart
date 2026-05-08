@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/theme/cover_image.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
+import 'package:tour_mobile/widgets/network_image_fallback.dart';
 
 class BrowseCategory {
   const BrowseCategory({required this.id, required this.label, required this.imageSeed});
@@ -59,12 +60,12 @@ class BrowseCategoriesRow extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: Image.network(
-                      categoryThumbUrl(c.imageSeed),
+                    child: NetworkImageWithFallback(
+                      urls: categoryThumbUrls(c.imageSeed),
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: Container(
                         width: 56,
                         height: 56,
                         color: TravelColors.line,

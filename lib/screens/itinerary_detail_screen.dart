@@ -4,6 +4,7 @@ import 'package:tour_mobile/services/favorites_service.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/theme/cover_image.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
+import 'package:tour_mobile/widgets/network_image_fallback.dart';
 
 class ItineraryDetailScreen extends StatefulWidget {
   const ItineraryDetailScreen({super.key, required this.itineraryId});
@@ -127,9 +128,13 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen> {
                       Image.network(
                         itineraryCoverUrl(it.id),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => ColoredBox(
-                          color: TravelColors.primary.withValues(alpha: 0.5),
-                          child: const Icon(Icons.landscape_rounded, size: 80, color: Colors.white54),
+                        errorBuilder: (_, __, ___) => NetworkImageWithFallback(
+                          urls: itineraryCoverUrls(it.id),
+                          fit: BoxFit.cover,
+                          placeholder: ColoredBox(
+                            color: TravelColors.primary.withValues(alpha: 0.5),
+                            child: const Icon(Icons.landscape_rounded, size: 80, color: Colors.white54),
+                          ),
                         ),
                       ),
                       DecoratedBox(

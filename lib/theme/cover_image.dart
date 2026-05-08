@@ -3,6 +3,10 @@
 /// We previously used Picsum seeds which often produced unrelated photos.
 /// This version uses query-based images with Nepal-specific keywords.
 String itineraryCoverUrl(String itineraryId) {
+  return itineraryCoverUrls(itineraryId).first;
+}
+
+List<String> itineraryCoverUrls(String itineraryId) {
   final id = itineraryId.trim().toLowerCase();
 
   // Curated, high-signal queries for better relevance.
@@ -28,11 +32,21 @@ String itineraryCoverUrl(String itineraryId) {
   // (source.unsplash.com supports `sig` to vary results; we derive it from the id.)
   final sig = id.codeUnits.fold<int>(0, (a, b) => (a + b) % 1000);
   final encoded = Uri.encodeComponent(query);
-  return 'https://source.unsplash.com/960x640/?$encoded&sig=$sig';
+  final unsplash = 'https://source.unsplash.com/960x640/?$encoded&sig=$sig';
+
+  // Fallback (more reliable host; may be less relevant).
+  final safe = id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), 'x');
+  final picsum = 'https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/960/640';
+
+  return [unsplash, picsum];
 }
 
 /// Smaller thumbs for browse categories.
 String categoryThumbUrl(String seed) {
+  return categoryThumbUrls(seed).first;
+}
+
+List<String> categoryThumbUrls(String seed) {
   final s = seed.trim().toLowerCase();
   final query = switch (s) {
     _ when s.contains('trek') => 'nepal trekking trail mountains',
@@ -43,5 +57,8 @@ String categoryThumbUrl(String seed) {
   };
   final sig = s.codeUnits.fold<int>(0, (a, b) => (a + b) % 1000);
   final encoded = Uri.encodeComponent(query);
-  return 'https://source.unsplash.com/160x160/?$encoded&sig=$sig';
+  final unsplash = 'https://source.unsplash.com/160x160/?$encoded&sig=$sig';
+  final safe = s.replaceAll(RegExp(r'[^a-zA-Z0-9]'), 'x');
+  final picsum = 'https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/160/160';
+  return [unsplash, picsum];
 }
