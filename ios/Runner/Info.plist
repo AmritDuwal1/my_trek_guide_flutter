@@ -73,5 +73,11 @@
 	<string>AIzaSyA-j3juLb4myEKv5GtUDQGcrVYrl66W3wA</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Show your position on the trek map while navigating.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to identify plants and animals.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo to identify plants and animals.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save identified photos to your library (optional).</string>
 </dict>
 </plist>

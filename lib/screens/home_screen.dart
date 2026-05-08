@@ -10,6 +10,7 @@ import 'package:tour_mobile/widgets/browse_categories_row.dart';
 import 'package:tour_mobile/widgets/city_glass_card.dart';
 import 'package:tour_mobile/widgets/explore_cities_tabs.dart';
 import 'package:tour_mobile/profile/user_session_store.dart';
+import 'package:tour_mobile/screens/identify/identify_plants_animals_screen.dart';
 import 'package:tour_mobile/widgets/home_user_greeting.dart';
 import 'package:tour_mobile/screens/place_search_screen.dart';
 import 'package:tour_mobile/widgets/travel_search_field.dart';
@@ -205,6 +206,60 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute<void>(builder: (_) => const PlaceSearchScreen()),
                       );
                     },
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: Material(
+                    color: TravelColors.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    elevation: 2,
+                    shadowColor: Colors.black.withValues(alpha: 0.06),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => const IdentifyPlantsAnimalsScreen()),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: TravelColors.navActive.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.pets_rounded, color: TravelColors.navActive),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Identify plants & animals',
+                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Tap to take a photo and identify.',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: TravelColors.muted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, color: TravelColors.muted),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

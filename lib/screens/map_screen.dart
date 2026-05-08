@@ -7,6 +7,7 @@ import 'package:tour_mobile/screens/map/in_app_route_navigation_screen.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 import 'package:tour_mobile/widgets/api_offline_block.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -20,6 +21,17 @@ class _MapScreenState extends State<MapScreen> {
   late Future<List<NepalPlace>> _future;
   final _mapController = MapController();
   double _zoom = 6.6;
+
+  Future<void> _openGoogleMapsDirections(NepalPlace place) async {
+    final dest = '${place.lat},${place.lng}';
+    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$dest&travelmode=driving');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Google Maps.')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -162,21 +174,41 @@ class _MapScreenState extends State<MapScreen> {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () {
-                  nav.pop();
-                  nav.push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => InAppRouteNavigationScreen(place: place),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        nav.pop();
+                        nav.push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => InAppRouteNavigationScreen(place: place),
+                          ),
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: TravelColors.navActive,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('In-app'),
                     ),
-                  );
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: TravelColors.navActive,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Navigate in app'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        nav.pop();
+                        await _openGoogleMapsDirections(place);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Google Maps'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

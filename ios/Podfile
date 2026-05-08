@@ -1,5 +1,5 @@
-# Google Maps Flutter recommends a modern iOS baseline.
-platform :ios, '14.0'
+# ML Kit plugins require iOS 15.5+
+platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
