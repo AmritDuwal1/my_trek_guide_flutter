@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tour_mobile/theme/cover_image.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
 class BrowseCategory {
@@ -59,7 +60,7 @@ class BrowseCategoriesRow extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: Image.network(
-                      'https://picsum.photos/seed/${c.imageSeed}/160/160',
+                      categoryThumbUrl(c.imageSeed),
                       width: 56,
                       height: 56,
                       fit: BoxFit.cover,
