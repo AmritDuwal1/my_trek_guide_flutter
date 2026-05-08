@@ -4,6 +4,7 @@ import 'package:tour_mobile/profile/profile_service.dart';
 import 'package:tour_mobile/profile/user_profile.dart';
 import 'package:tour_mobile/screens/profile/edit_profile_screen.dart';
 import 'package:tour_mobile/screens/support/help_complaints_screen.dart';
+import 'package:tour_mobile/screens/support/chat_support_screen.dart';
 import 'package:tour_mobile/screens/support/reviews_ratings_screen.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
@@ -142,6 +143,15 @@ class ProfileScreen extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const HelpComplaintsScreen()),
+              );
+            },
+          ),
+          _ProfileRow(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Chat support',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ChatSupportScreen()),
               );
             },
           ),
