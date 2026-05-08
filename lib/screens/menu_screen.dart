@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:tour_mobile/screens/explore_screen.dart';
+import 'package:tour_mobile/screens/map_screen.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
 class MenuScreen extends StatelessWidget {
@@ -31,8 +33,12 @@ class MenuScreen extends StatelessWidget {
               delegate: SliverChildListDelegate([
                 _MenuTile(icon: Icons.list_alt_rounded, label: 'All places', onTap: () => _openExplore(context)),
                 _MenuTile(icon: Icons.map_rounded, label: 'Map', onTap: () => _openMap(context)),
-                _MenuTile(icon: Icons.hiking_rounded, label: 'Treks', onTap: () {}),
-                _MenuTile(icon: Icons.account_balance_rounded, label: 'Heritage', onTap: () {}),
+                _MenuTile(icon: Icons.hiking_rounded, label: 'Treks', onTap: () => _openExplore(context, typeFilter: 'Trek')),
+                _MenuTile(
+                  icon: Icons.account_balance_rounded,
+                  label: 'Heritage',
+                  onTap: () => _openExplore(context, typeFilter: 'Heritage'),
+                ),
               ]),
             ),
           ),
@@ -42,17 +48,19 @@ class MenuScreen extends StatelessWidget {
   }
 }
 
-void _openExplore(BuildContext context) {
-  // Explore list already exists as the "All places" experience via ExploreScreen in earlier build.
-  // For now, keep this as a placeholder route hook if needed later.
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Open Explore: use the Nepal list tab in the app')),
+void _openExplore(BuildContext context, {String? typeFilter}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ExploreScreen(typeFilter: typeFilter),
+    ),
   );
 }
 
 void _openMap(BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Open Map: use the Map tab (compass icon)')),
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => const MapScreen(),
+    ),
   );
 }
 

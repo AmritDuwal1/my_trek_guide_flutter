@@ -7,7 +7,10 @@ import 'package:tour_mobile/widgets/api_offline_block.dart';
 
 /// Alphabetic list of all Nepal travel places from the API, grouped by province.
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  const ExploreScreen({super.key, this.typeFilter});
+
+  /// Optional exact place type filter (e.g. `Trek`, `Heritage`).
+  final String? typeFilter;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -54,10 +57,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
           if (snapshot.hasError) {
             return ApiOfflineBlock(onRetry: _reload);
           }
-          final places = snapshot.data ?? const <NepalPlace>[];
+          final all = snapshot.data ?? const <NepalPlace>[];
+          final tf = widget.typeFilter?.trim();
+          final places = (tf == null || tf.isEmpty) ? all : all.where((p) => p.type == tf).toList();
           if (places.isEmpty) {
             return Center(
-              child: Text('No places loaded.', style: Theme.of(context).textTheme.bodyLarge),
+              child: Text(
+                tf == null || tf.isEmpty ? 'No places loaded.' : 'No places found for "$tf".',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
             );
           }
           final grouped = _groupByProvince(places);
@@ -76,7 +85,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Nepal',
+                          tf == null || tf.isEmpty ? 'Nepal' : tf,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 4),
