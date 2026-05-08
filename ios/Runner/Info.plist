@@ -58,15 +58,6 @@
 	</array>
 	<key>GIDClientID</key>
 	<string>1053627493780-pgist6aeneolinu4m33ihkv7bggkl6fp.apps.googleusercontent.com</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-	<dict>
-		<key>CFBundleURLSchemes</key>
-		<array>
-		<string>com.googleusercontent.apps.1053627493780-pgist6aeneolinu4m33ihkv7bggkl6fp</string>
-		</array>
-	</dict>
-	</array>
 	<key>GIDServerClientID</key>
 	<string>1053627493780-pgist6aeneolinu4m33ihkv7bggkl6fp.apps.googleusercontent.com</string>
 	<key>GMSApiKey</key>
