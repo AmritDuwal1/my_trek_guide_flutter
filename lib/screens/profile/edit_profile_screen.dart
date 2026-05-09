@@ -129,7 +129,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final now = DateTime.now().millisecondsSinceEpoch;
       var url = _photoUrl;
       if (_newPhoto != null) {
-        url = await _service.uploadProfilePhoto(uid: _user.uid, file: _newPhoto!);
+        url = await _service.uploadProfilePhoto(file: _newPhoto!);
       }
 
       final age = int.tryParse(_age.text.trim()) ?? 0;

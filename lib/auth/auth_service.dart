@@ -109,7 +109,11 @@ class AuthService {
     } catch (_) {
       // Best-effort: continue so user can still delete their auth account.
     }
-    await profile.deleteProfilePhoto(uid: user.uid);
+    try {
+      await profile.deleteProfilePhoto();
+    } catch (_) {
+      // ignore
+    }
 
     // 2) Delete Firebase Auth user (may require recent login).
     try {

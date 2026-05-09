@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:tour_mobile/config/api_config.dart';
 import 'package:tour_mobile/services/logging_http_client.dart';
@@ -11,12 +10,11 @@ import 'package:tour_mobile/profile/user_profile.dart';
 class ProfileService {
   ProfileService({
     http.Client? client,
-    FirebaseStorage? storage,
   })  : _client = client ?? LoggingHttpClient(),
-        _storage = storage ?? FirebaseStorage.instance;
+        _clientRaw = http.Client();
 
   final http.Client _client;
-  final FirebaseStorage _storage;
+  final http.Client _clientRaw;
 
   Uri _uri(String path) => Uri.parse('${apiBaseUrl()}$path');
 
@@ -80,22 +78,38 @@ class ProfileService {
     }
   }
 
-  Future<void> deleteProfilePhoto({required String uid}) async {
-    final ref = _storage.ref('users/$uid/profile.jpg');
-    try {
-      await ref.delete();
-    } catch (_) {
-      // ignore if missing
+  Future<void> deleteProfilePhoto() async {
+    final res = await _client.delete(
+      _uri('/profile/photo/'),
+      headers: {
+        ...await _authHeaders(),
+      },
+    );
+    if (res.statusCode == 401) {
+      throw Exception('Unauthorized (sign in again)');
+    }
+    if (res.statusCode != 200) {
+      throw Exception('Failed to delete photo (${res.statusCode})');
     }
   }
 
   Future<String> uploadProfilePhoto({
-    required String uid,
     required File file,
   }) async {
-    final ref = _storage.ref('users/$uid/profile.jpg');
-    await ref.putFile(file);
-    return ref.getDownloadURL();
+    final req = http.MultipartRequest('POST', _uri('/profile/photo/'))
+      ..headers.addAll(await _authHeaders())
+      ..files.add(await http.MultipartFile.fromPath('photo', file.path));
+
+    final streamed = await _clientRaw.send(req);
+    final res = await http.Response.fromStream(streamed);
+    if (res.statusCode == 401) {
+      throw Exception('Unauthorized (sign in again)');
+    }
+    if (res.statusCode != 200) {
+      throw Exception('Failed to upload photo (${res.statusCode})');
+    }
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    return (json['photoUrl'] as String?) ?? '';
   }
 }
 

@@ -208,7 +208,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                       String photoUrl = '';
                       if (_photo != null) {
-                        photoUrl = await _profiles.uploadProfilePhoto(uid: user.uid, file: _photo!);
+                        photoUrl = await _profiles.uploadProfilePhoto(file: _photo!);
                       }
 
                       final now = DateTime.now().millisecondsSinceEpoch;
