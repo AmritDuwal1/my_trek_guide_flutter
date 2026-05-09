@@ -29,7 +29,7 @@ class FavoritesService {
 
   Future<bool> isFavorite(String itineraryId) async {
     final res = await _client.get(_uri('/favorites/$itineraryId/'), headers: await _authHeaders());
-    if (res.statusCode == 401) throw Exception('Unauthorized');
+    if (res.statusCode == 401) return false;
     if (res.statusCode != 200) throw Exception('Failed (${res.statusCode})');
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     return (json['favorite'] as bool?) ?? false;
@@ -43,7 +43,9 @@ class FavoritesService {
     } else {
       res = await _client.delete(_uri('/favorites/$itineraryId/'), headers: headers);
     }
-    if (res.statusCode == 401) throw Exception('Unauthorized');
+    if (res.statusCode == 401) {
+      throw Exception('Unauthorized (please sign in)');
+    }
     if (res.statusCode != 200) throw Exception('Failed (${res.statusCode})');
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     return (json['favorite'] as bool?) ?? favorite;
@@ -51,7 +53,7 @@ class FavoritesService {
 
   Future<List<Itinerary>> fetchFavorites() async {
     final res = await _client.get(_uri('/favorites/'), headers: await _authHeaders());
-    if (res.statusCode == 401) throw Exception('Unauthorized');
+    if (res.statusCode == 401) return const <Itinerary>[];
     if (res.statusCode != 200) throw Exception('Failed (${res.statusCode})');
     final list = jsonDecode(res.body) as List<dynamic>;
     return list.map((e) => Itinerary.fromJson(e as Map<String, dynamic>)).toList();

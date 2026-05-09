@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -25,9 +26,14 @@ class AuthService {
     if (user == null) {
       throw StateError('No signed-in user');
     }
-    final token = await user.getIdToken();
+    final token = await user.getIdToken(true);
     if (token == null || token.isEmpty) {
       throw Exception('Could not obtain ID token for API');
+    }
+    if (kDebugMode) {
+      debugPrint('[AUTH] linkSessionWithApi uid=${user.uid}');
+      debugPrint('[AUTH] apiBaseUrl=${apiBaseUrl()} isLive=$isLive');
+      debugPrint('[AUTH] idToken length=${token.length} prefix=${token.substring(0, token.length < 12 ? token.length : 12)}');
     }
     final res = await _apiClient.get(
       Uri.parse('${apiBaseUrl()}/me/'),
@@ -37,6 +43,9 @@ class AuthService {
       },
     );
     if (res.statusCode != 200) {
+      if (kDebugMode) {
+        debugPrint('[AUTH] /me/ failed status=${res.statusCode} body=${res.body}');
+      }
       throw Exception('Could not link session with API (${res.statusCode})');
     }
     final linked = _auth.currentUser;
@@ -49,18 +58,32 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-    await linkSessionWithApi();
-    return cred;
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      await linkSessionWithApi();
+      return cred;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AUTH] signUpWithEmail failed code=${e.code} message=${e.message}');
+      }
+      rethrow;
+    }
   }
 
   Future<UserCredential> signInWithEmail({
     required String email,
     required String password,
   }) async {
-    final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
-    await linkSessionWithApi();
-    return cred;
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await linkSessionWithApi();
+      return cred;
+    } on FirebaseAuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[AUTH] signInWithEmail failed code=${e.code} message=${e.message}');
+      }
+      rethrow;
+    }
   }
 
   Future<UserCredential> signInWithGoogle() async {

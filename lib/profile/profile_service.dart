@@ -37,9 +37,7 @@ class ProfileService {
     // UID comes from FirebaseAuth; the API resolves the current user from token.
     final res = await _client.get(_uri('/profile/'), headers: await _authHeaders());
     if (res.statusCode == 404) return null;
-    if (res.statusCode == 401) {
-      throw Exception('Unauthorized (sign in again)');
-    }
+    if (res.statusCode == 401) return null;
     if (res.statusCode != 200) {
       throw Exception('Failed to load profile (${res.statusCode})');
     }

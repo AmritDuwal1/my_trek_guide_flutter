@@ -4,21 +4,70 @@ import 'package:tour_mobile/auth/auth_service.dart';
 import 'package:tour_mobile/screens/auth/sign_in_screen.dart';
 import 'package:tour_mobile/screens/shell_screen.dart';
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final AuthService _auth = AuthService();
+
+  String? _linkingUid;
+  Future<void>? _linkFuture;
+  String? _handledLinkErrorUid;
+
+  void _ensureLinkFuture(User user) {
+    if (_linkFuture != null && _linkingUid == user.uid) return;
+    _linkingUid = user.uid;
+    _handledLinkErrorUid = null;
+    _linkFuture = _auth.linkSessionWithApi();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final auth = AuthService();
     return StreamBuilder<User?>(
-      stream: auth.authStateChanges(),
+      stream: _auth.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
+
         final user = snapshot.data;
         if (user == null) return const SignInScreen();
-        return const ShellScreen();
+
+        _ensureLinkFuture(user);
+        return FutureBuilder<void>(
+          future: _linkFuture,
+          builder: (context, linkSnap) {
+            if (linkSnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+
+            if (linkSnap.hasError) {
+              // Backend auth failed. Keep the user out of the app and show a clear error.
+              if (_handledLinkErrorUid != user.uid) {
+                _handledLinkErrorUid = user.uid;
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!mounted) return;
+                  final msg = linkSnap.error?.toString() ?? 'Could not sign in';
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  await _auth.signOut();
+                  if (!mounted) return;
+                  // Reset so a new login attempt triggers a fresh link.
+                  setState(() {
+                    _linkingUid = null;
+                    _linkFuture = null;
+                  });
+                });
+              }
+              return const SignInScreen();
+            }
+
+            return const ShellScreen();
+          },
+        );
       },
     );
   }
