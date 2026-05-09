@@ -17,7 +17,7 @@ class TravelShellNav extends StatelessWidget {
     final items = <IconData>[
       Icons.home_rounded,
       Icons.explore_outlined,
-      Icons.grid_view_rounded,
+      // Icons.grid_view_rounded,
       Icons.favorite_border_rounded,
       Icons.person_outline_rounded,
     ];

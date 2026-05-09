@@ -25,7 +25,7 @@ class _ShellScreenState extends State<ShellScreen> {
         children: const [
           HomeScreen(),
           MapScreen(),
-          MenuScreen(),
+          // MenuScreen(),
           FavoritesScreen(),
           ProfileScreen(),
         ],
