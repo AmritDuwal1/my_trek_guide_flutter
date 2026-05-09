@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:tour_mobile/auth/guest_mode_store.dart';
 import 'package:tour_mobile/profile/profile_service.dart';
 import 'package:tour_mobile/config/api_config.dart';
 import 'package:tour_mobile/profile/user_session_store.dart';
@@ -48,6 +49,8 @@ class AuthService {
       }
       throw Exception('Could not link session with API (${res.statusCode})');
     }
+    // Successful API link: disable guest mode.
+    await GuestModeStore.setEnabled(false);
     final linked = _auth.currentUser;
     if (linked != null) {
       await UserSessionStore.persistFromFirebaseUser(linked);

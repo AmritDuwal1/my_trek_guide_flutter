@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/auth/auth_service.dart';
+import 'package:tour_mobile/auth/guest_mode_store.dart';
+import 'package:tour_mobile/screens/shell_screen.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
 import 'sign_up_screen.dart';
@@ -36,6 +38,20 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  Future<void> _skipLogin() async {
+    setState(() => _busy = true);
+    try {
+      await GuestModeStore.setEnabled(true);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const ShellScreen()));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -51,6 +67,13 @@ class _SignInScreenState extends State<SignInScreen> {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: TravelColors.muted),
             ),
             const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _busy ? null : _skipLogin,
+                child: const Text('Skip for now'),
+              ),
+            ),
             _Field(label: 'Email', controller: _email, keyboard: TextInputType.emailAddress),
             const SizedBox(height: 12),
             _Field(label: 'Password', controller: _password, obscure: true),

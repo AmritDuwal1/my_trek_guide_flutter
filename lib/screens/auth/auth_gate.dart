@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/auth/auth_service.dart';
+import 'package:tour_mobile/auth/guest_mode_store.dart';
 import 'package:tour_mobile/screens/auth/sign_in_screen.dart';
 import 'package:tour_mobile/screens/shell_screen.dart';
 
@@ -17,6 +18,7 @@ class _AuthGateState extends State<AuthGate> {
   String? _linkingUid;
   Future<void>? _linkFuture;
   String? _handledLinkErrorUid;
+  Future<bool>? _guestFuture;
 
   void _ensureLinkFuture(User user) {
     if (_linkFuture != null && _linkingUid == user.uid) return;
@@ -35,7 +37,19 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         final user = snapshot.data;
-        if (user == null) return const SignInScreen();
+        if (user == null) {
+          _guestFuture ??= GuestModeStore.isEnabled();
+          return FutureBuilder<bool>(
+            future: _guestFuture,
+            builder: (context, guestSnap) {
+              if (guestSnap.connectionState == ConnectionState.waiting) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              }
+              if (guestSnap.data == true) return const ShellScreen();
+              return const SignInScreen();
+            },
+          );
+        }
 
         _ensureLinkFuture(user);
         return FutureBuilder<void>(
@@ -59,6 +73,7 @@ class _AuthGateState extends State<AuthGate> {
                   setState(() {
                     _linkingUid = null;
                     _linkFuture = null;
+                    _guestFuture = null;
                   });
                 });
               }
