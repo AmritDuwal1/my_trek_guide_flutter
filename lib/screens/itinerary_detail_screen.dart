@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/models/itinerary.dart';
+import 'package:tour_mobile/auth/auth_required.dart';
 import 'package:tour_mobile/services/favorites_service.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/theme/cover_image.dart';
@@ -42,6 +43,8 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     if (_favBusy) return;
+    final ok = await ensureSignedIn(context, message: 'Sign in to save favorites.');
+    if (!ok) return;
     setState(() {
       _favBusy = true;
       _favorite = !_favorite;

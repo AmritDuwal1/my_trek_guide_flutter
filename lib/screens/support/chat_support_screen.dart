@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:tour_mobile/auth/auth_required.dart';
 import 'package:tour_mobile/services/support_chat_service.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 
@@ -20,6 +21,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   bool _busy = true;
   bool _sending = false;
   String? _error;
+  bool _authNeeded = false;
   final List<SupportChatMessage> _messages = [];
 
   int? get _lastMs => _messages.isEmpty ? null : _messages.last.createdAtMs;
@@ -47,6 +49,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       if (newMsgs.isNotEmpty) {
         setState(() {
           _error = null;
+          _authNeeded = false;
           _messages.addAll(newMsgs);
         });
         await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -58,11 +61,24 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
           );
         }
       } else if (initial) {
-        setState(() => _error = null);
+        setState(() {
+          _error = null;
+          _authNeeded = false;
+        });
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      final msg = e.toString();
+      if (msg.contains('Unauthorized')) {
+        // Don't pop dialogs during background polling; show an inline CTA instead.
+        _poll?.cancel();
+        setState(() {
+          _authNeeded = true;
+          _error = 'Sign in to chat with support.';
+        });
+        return;
+      }
+      if (mounted) setState(() => _error = msg);
     } finally {
       if (mounted && initial) setState(() => _busy = false);
     }
@@ -71,6 +87,8 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   Future<void> _send() async {
     final text = _composer.text.trim();
     if (text.isEmpty || _sending) return;
+    final ok = await ensureSignedIn(context, message: 'Sign in to send messages to support.');
+    if (!ok) return;
     setState(() => _sending = true);
     try {
       final msg = await _svc.sendMessage(text);
@@ -90,7 +108,15 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      final msg = e.toString();
+      if (msg.contains('Unauthorized')) {
+        setState(() {
+          _authNeeded = true;
+          _error = 'Sign in to chat with support.';
+        });
+        return;
+      }
+      if (mounted) setState(() => _error = msg);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -103,10 +129,40 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       appBar: AppBar(title: const Text('Chat support')),
       body: Column(
         children: [
-          if (_error != null)
+          if (_error != null || _authNeeded)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Text(_error!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red.shade700)),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _error ?? '',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: _authNeeded ? Colors.orange.shade900 : Colors.red.shade700,
+                          ),
+                    ),
+                  ),
+                  if (_authNeeded) ...[
+                    const SizedBox(width: 10),
+                    TextButton(
+                      onPressed: () async {
+                        final ok = await ensureSignedIn(context, message: 'Sign in to chat with support.');
+                        if (!ok) return;
+                        if (!mounted) return;
+                        setState(() {
+                          _authNeeded = false;
+                          _error = null;
+                          _busy = true;
+                        });
+                        _poll?.cancel();
+                        _load(initial: true);
+                        _poll = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+                      },
+                      child: const Text('Sign in'),
+                    ),
+                  ],
+                ],
+              ),
             ),
           Expanded(
             child: _busy

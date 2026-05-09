@@ -30,6 +30,11 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() => _busy = true);
     try {
       await fn();
+      // If this screen was opened as a route (e.g. from an auth-required prompt),
+      // close it after successful login so the user returns to the app.
+      if (mounted) {
+        await Navigator.of(context).maybePop();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
