@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:tour_mobile/auth/auth_service.dart';
 import 'package:tour_mobile/profile/profile_service.dart';
 import 'package:tour_mobile/profile/user_profile.dart';
+import 'package:tour_mobile/screens/auth/sign_in_screen.dart';
 import 'package:tour_mobile/screens/profile/edit_profile_screen.dart';
 import 'package:tour_mobile/screens/support/help_complaints_screen.dart';
 import 'package:tour_mobile/screens/support/chat_support_screen.dart';
@@ -165,11 +166,22 @@ class ProfileScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: 6),
-          _ProfileRow(
-            icon: Icons.logout_rounded,
-            label: 'Logout',
-            onTap: () async => auth.signOut(),
-          ),
+          if (user != null)
+            _ProfileRow(
+              icon: Icons.logout_rounded,
+              label: 'Logout',
+              onTap: () async => auth.signOut(),
+            )
+          else
+            _ProfileRow(
+              icon: Icons.login_rounded,
+              label: 'Sign in',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const SignInScreen()),
+                );
+              },
+            ),
           if (user != null) ...[
             const SizedBox(height: 6),
             _ProfileRow(
