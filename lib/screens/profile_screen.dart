@@ -136,7 +136,7 @@ class ProfileScreen extends StatelessWidget {
               },
             ),
           // _ProfileRow(icon: Icons.bookmark_outline_rounded, label: 'Saved places'),
-          _ProfileRow(icon: Icons.settings_outlined, label: 'Settings'),
+          // _ProfileRow(icon: Icons.settings_outlined, label: 'Settings'),
           _ProfileRow(
             icon: Icons.support_agent_rounded,
             label: 'Help & Complaints',
