@@ -104,10 +104,29 @@ class AuthService {
     return userCred;
   }
 
-  Future<UserCredential> signInWithApple() async {
-    final result = await SignInWithApple.getAppleIDCredential(
+  /// Android/web: Firebase opens the OAuth flow against `__/auth/handler` correctly.
+  /// iOS/macOS: native `sign_in_with_apple` (do not use Firebase handler as
+  /// `sign_in_with_apple`’s [WebAuthenticationOptions.redirectUri] — that page
+  /// expects Firebase JS sessionStorage and shows "missing initial state").
+  bool get _useFirebaseAppleOAuth =>
+      defaultTargetPlatform == TargetPlatform.android || kIsWeb;
+
+  Future<AuthorizationCredentialAppleID> _appleIdCredentialNative() async {
+    return SignInWithApple.getAppleIDCredential(
       scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
     );
+  }
+
+  Future<UserCredential> signInWithApple() async {
+    if (_useFirebaseAppleOAuth) {
+      final apple = AppleAuthProvider();
+      apple.addScope('email');
+      apple.addScope('name');
+      final cred = await _auth.signInWithProvider(apple);
+      await linkSessionWithApi();
+      return cred;
+    }
+    final result = await _appleIdCredentialNative();
     final oauthCred = OAuthProvider('apple.com').credential(
       idToken: result.identityToken,
       accessToken: result.authorizationCode,
@@ -172,9 +191,14 @@ class AuthService {
     }
 
     if (providers.contains('apple.com')) {
-      final result = await SignInWithApple.getAppleIDCredential(
-        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
-      );
+      if (_useFirebaseAppleOAuth) {
+        final apple = AppleAuthProvider();
+        apple.addScope('email');
+        apple.addScope('name');
+        await user.reauthenticateWithProvider(apple);
+        return;
+      }
+      final result = await _appleIdCredentialNative();
       final cred = OAuthProvider('apple.com').credential(
         idToken: result.identityToken,
         accessToken: result.authorizationCode,
