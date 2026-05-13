@@ -248,26 +248,57 @@ class _InAppRouteNavigationScreenState extends State<InAppRouteNavigationScreen>
     return out;
   }
 
+  /// Builds the journey polyline shown on the map.
+  ///
+  /// Priority:
+  ///   1. `routePath` (treks have a dense trail trace) → use it, with
+  ///      Kathmandu prepended for context.
+  ///   2. `dayLocations` (curated overnight stops for non-treks too) →
+  ///      use them as the journey, with Kathmandu prepended if Day 1
+  ///      isn't already near Kathmandu.
+  ///   3. Single-day fallback → just the destination point.
+  ///
+  /// Multi-day trips always start from Kathmandu so the user sees how
+  /// they get to the destination, not just a marker dropped into a
+  /// remote village.
   static List<LatLng> _routePoints(NepalPlace place) {
-    // For treks, route starts from Kathmandu so users see where the
-    // trip actually originates rather than dropping into a remote
-    // trailhead.
+    final dc = place.dayCount ?? 1;
+    final isMultiDay = dc > 1 || place.type == 'Trek';
+
+    bool nearKathmandu(LatLng p) {
+      // ~3 km tolerance: if Day 1 is already Kathmandu, skip prepending.
+      return _distCalc.as(LengthUnit.Meter, p, _kathmandu) < 3000;
+    }
+
     final pts = <LatLng>[];
-    if (place.type == 'Trek') {
-      pts.add(_kathmandu);
-    }
+
     if (place.routePath != null && place.routePath!.length >= 2) {
-      pts.addAll(place.routePath!.map((e) => LatLng(e.lat, e.lng)));
+      final rp = place.routePath!.map((e) => LatLng(e.lat, e.lng)).toList();
+      if (isMultiDay && !nearKathmandu(rp.first)) pts.add(_kathmandu);
+      pts.addAll(rp);
       return pts;
     }
-    if (place.type == 'Trek' && place.vehicleLat != null && place.vehicleLng != null) {
-      pts.addAll([
-        LatLng(place.vehicleLat!, place.vehicleLng!),
-        LatLng(place.lat, place.lng),
-      ]);
+
+    final dl = place.dayLocations;
+    if (dl != null && dl.isNotEmpty) {
+      final dlPts = dl.map((e) => LatLng(e.lat, e.lng)).toList();
+      if (isMultiDay && !nearKathmandu(dlPts.first)) pts.add(_kathmandu);
+      pts.addAll(dlPts);
       return pts;
     }
-    pts.add(LatLng(place.lat, place.lng));
+
+    if (place.type == 'Trek' &&
+        place.vehicleLat != null &&
+        place.vehicleLng != null) {
+      pts.add(_kathmandu);
+      pts.add(LatLng(place.vehicleLat!, place.vehicleLng!));
+      pts.add(LatLng(place.lat, place.lng));
+      return pts;
+    }
+
+    final dest = LatLng(place.lat, place.lng);
+    if (isMultiDay && !nearKathmandu(dest)) pts.add(_kathmandu);
+    pts.add(dest);
     return pts;
   }
 
