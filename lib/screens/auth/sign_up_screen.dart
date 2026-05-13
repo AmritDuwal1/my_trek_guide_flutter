@@ -21,6 +21,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _fullName = TextEditingController();
+  // Age, location and phone are *optional* fields. They are not required
+  // for the app's core functionality (browsing itineraries, maps, etc.)
+  // and the user can leave them blank or skip them entirely. The form
+  // labels and helper text below make this explicit.
   final _age = TextEditingController();
   final _location = TextEditingController();
   final _phone = TextEditingController();
@@ -117,7 +121,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           const SizedBox(height: 12),
           InputDecorator(
             decoration: InputDecoration(
-              labelText: 'Gender',
+              labelText: 'Gender (optional)',
               filled: true,
               fillColor: TravelColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
@@ -137,12 +141,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          Text(
+            'The fields below are optional. You can leave them empty.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: TravelColors.muted),
+          ),
+          const SizedBox(height: 10),
           TextField(
             controller: _age,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              labelText: 'Age',
+              labelText: 'Age (optional)',
+              helperText: 'Helps us tailor activity suggestions. Not required.',
               filled: true,
               fillColor: TravelColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
@@ -153,7 +163,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           TextField(
             controller: _location,
             decoration: InputDecoration(
-              labelText: 'Location',
+              labelText: 'Location (optional)',
+              helperText: 'Used to suggest nearby itineraries. Not required.',
               filled: true,
               fillColor: TravelColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
@@ -165,14 +176,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              labelText: 'Phone number',
+              labelText: 'Phone number (optional)',
+              helperText: 'Used only for trip-related support. Not required.',
               filled: true,
               fillColor: TravelColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           TextField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
@@ -190,7 +202,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             obscureText: true,
             decoration: InputDecoration(
               labelText: 'Password',
-              helperText: 'At least 6 characters (Firebase default).',
+              helperText: 'At least 6 characters.',
               filled: true,
               fillColor: TravelColors.surface,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: TravelColors.line)),
@@ -212,6 +224,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       }
 
                       final now = DateTime.now().millisecondsSinceEpoch;
+                      // Age, location and phone are optional — when the
+                      // user leaves them blank we store empty / 0 values.
+                      // The fields are clearly labelled "(optional)" in
+                      // the UI and are not enforced on save.
                       final profile = UserProfile(
                         uid: user.uid,
                         fullName: _fullName.text.trim(),

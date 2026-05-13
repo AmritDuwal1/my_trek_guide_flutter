@@ -212,21 +212,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 18),
                 _textField(label: 'Full name', controller: _name),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                Text(
+                  'The fields below are optional. You can leave them empty.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: TravelColors.muted),
+                ),
+                const SizedBox(height: 10),
                 _genderField(context),
                 const SizedBox(height: 12),
                 _textField(
-                  label: 'Age',
+                  label: 'Age (optional)',
                   controller: _age,
                   keyboardType: TextInputType.number,
+                  helperText: 'Helps us tailor activity suggestions. Not required.',
                 ),
                 const SizedBox(height: 12),
                 _locationField(context),
                 const SizedBox(height: 12),
                 _textField(
-                  label: 'Phone number',
+                  label: 'Phone number (optional)',
                   controller: _phone,
                   keyboardType: TextInputType.phone,
+                  helperText: 'Used only for trip-related support. Not required.',
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -243,7 +250,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       controller: _location,
       textCapitalization: TextCapitalization.sentences,
       decoration: InputDecoration(
-        labelText: 'Location',
+        labelText: 'Location (optional)',
+        helperText: 'Used to suggest nearby itineraries. Not required.',
         filled: true,
         fillColor: TravelColors.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
@@ -260,7 +268,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _genderField(BuildContext context) {
     return InputDecorator(
       decoration: InputDecoration(
-        labelText: 'Gender',
+        labelText: 'Gender (optional)',
         filled: true,
         fillColor: TravelColors.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
@@ -286,12 +294,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required String label,
     required TextEditingController controller,
     TextInputType? keyboardType,
+    String? helperText,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
+        helperText: helperText,
         filled: true,
         fillColor: TravelColors.surface,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: TravelColors.line)),
