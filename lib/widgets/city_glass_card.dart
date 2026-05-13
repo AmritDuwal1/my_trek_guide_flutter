@@ -42,16 +42,18 @@ class CityGlassCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  itineraryCoverUrl(itinerary.id),
+                NetworkImageWithFallback(
+                  urls: itineraryCoverUrls(
+                    itinerary.id,
+                    preferred: [
+                      if (itinerary.imageUrl != null) itinerary.imageUrl!,
+                      ...itinerary.imageUrls,
+                    ],
+                  ),
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => NetworkImageWithFallback(
-                    urls: itineraryCoverUrls(itinerary.id),
-                    fit: BoxFit.cover,
-                    placeholder: ColoredBox(
+                  placeholder: ColoredBox(
                     color: TravelColors.navActive.withValues(alpha: 0.25),
                     child: const Icon(Icons.landscape_rounded, size: 48, color: Colors.white70),
-                    ),
                   ),
                 ),
                 Positioned(

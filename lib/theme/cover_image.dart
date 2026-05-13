@@ -1,16 +1,27 @@
 /// Hero image per itinerary.
 ///
-/// We previously used Picsum seeds which often produced unrelated photos.
-/// This version uses query-based images with Nepal-specific keywords.
-String itineraryCoverUrl(String itineraryId) {
+/// Prefer the explicit `image_url` / `image_urls` provided by the API
+/// (canonical Wikipedia / Wikimedia Commons photo of the specific place).
+/// Fall back to keyword-based search only when no explicit URL is available.
+
+/// Single URL for the cover, falling back to the keyword-based default.
+String itineraryCoverUrl(String itineraryId, {String? explicitUrl}) {
+  if (explicitUrl != null && explicitUrl.trim().isNotEmpty) return explicitUrl;
   return itineraryCoverUrls(itineraryId).first;
 }
 
-List<String> itineraryCoverUrls(String itineraryId) {
+/// Ordered list of URLs to try in sequence (used with [NetworkImageWithFallback]).
+List<String> itineraryCoverUrls(
+  String itineraryId, {
+  List<String> preferred = const [],
+}) {
   final id = itineraryId.trim().toLowerCase();
 
-  // Curated, high-signal queries for better relevance.
-  // (No hardcoded copyrighted images; uses a public photo source endpoint.)
+  final out = <String>[
+    for (final u in preferred)
+      if (u.trim().isNotEmpty) u.trim(),
+  ];
+
   final query = switch (id) {
     _ when id.contains('nagarkot') => 'nagarkot nepal sunrise himalayas viewpoint',
     _ when id.contains('phew') || id.contains('phewa') => 'phewa lake pokhara nepal',
@@ -28,17 +39,21 @@ List<String> itineraryCoverUrls(String itineraryId) {
     _ => 'nepal travel mountains temples',
   };
 
-  // Use a deterministic-ish "sig" so the same id tends to keep the same photo.
-  // (source.unsplash.com supports `sig` to vary results; we derive it from the id.)
-  final sig = id.codeUnits.fold<int>(0, (a, b) => (a + b) % 1000);
-  final encoded = Uri.encodeComponent(query);
-  final unsplash = 'https://source.unsplash.com/960x640/?$encoded&sig=$sig';
-
-  // Fallback (more reliable host; may be less relevant).
   final safe = id.replaceAll(RegExp(r'[^a-zA-Z0-9]'), 'x');
-  final picsum = 'https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/960/640';
+  // Last-resort placeholder. Unsplash's "source" endpoint is deprecated and
+  // returns random photos, so we only use Picsum as a generic backdrop and
+  // never as a primary "this is the place" image.
+  out.add('https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/960/640');
 
-  return [unsplash, picsum];
+  // Add the Wikipedia-keyword-search redirect as an extra hint when the API
+  // didn't supply a URL. Note: this is not a guaranteed image; it relies on
+  // the `preferred` list above for the real per-place photo.
+  if (preferred.isEmpty) {
+    final encoded = Uri.encodeComponent(query);
+    out.insert(0, 'https://commons.wikimedia.org/wiki/Special:FilePath/$encoded.jpg?width=960');
+  }
+
+  return out;
 }
 
 /// Smaller thumbs for browse categories.
@@ -48,17 +63,8 @@ String categoryThumbUrl(String seed) {
 
 List<String> categoryThumbUrls(String seed) {
   final s = seed.trim().toLowerCase();
-  final query = switch (s) {
-    _ when s.contains('trek') => 'nepal trekking trail mountains',
-    _ when s.contains('temple') || s.contains('heritage') => 'nepal temple heritage',
-    _ when s.contains('wild') || s.contains('rhino') => 'nepal wildlife rhino',
-    _ when s.contains('lake') || s.contains('phewa') => 'nepal lake',
-    _ => 'nepal travel',
-  };
-  final sig = s.codeUnits.fold<int>(0, (a, b) => (a + b) % 1000);
-  final encoded = Uri.encodeComponent(query);
-  final unsplash = 'https://source.unsplash.com/160x160/?$encoded&sig=$sig';
   final safe = s.replaceAll(RegExp(r'[^a-zA-Z0-9]'), 'x');
-  final picsum = 'https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/160/160';
-  return [unsplash, picsum];
+  return [
+    'https://picsum.photos/seed/${safe.isEmpty ? 'tour' : safe}/160/160',
+  ];
 }

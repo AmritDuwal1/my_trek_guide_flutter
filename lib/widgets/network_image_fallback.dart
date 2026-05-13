@@ -25,6 +25,7 @@ class _NetworkImageWithFallbackState extends State<NetworkImageWithFallback> {
   int _i = 0;
 
   void _next() {
+    if (!mounted) return;
     if (_i + 1 >= widget.urls.length) return;
     setState(() => _i += 1);
   }
@@ -48,10 +49,12 @@ class _NetworkImageWithFallbackState extends State<NetworkImageWithFallback> {
       fit: widget.fit,
       width: widget.width,
       height: widget.height,
+      gaplessPlayback: true,
       errorBuilder: (context, error, stack) {
         if (_i + 1 < urls.length) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _next());
-          return widget.placeholder ?? const SizedBox.shrink();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _next();
+          });
         }
         return widget.placeholder ?? const SizedBox.shrink();
       },

@@ -128,16 +128,18 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen> {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        itineraryCoverUrl(it.id),
+                      NetworkImageWithFallback(
+                        urls: itineraryCoverUrls(
+                          it.id,
+                          preferred: [
+                            if (it.imageUrl != null) it.imageUrl!,
+                            ...it.imageUrls,
+                          ],
+                        ),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => NetworkImageWithFallback(
-                          urls: itineraryCoverUrls(it.id),
-                          fit: BoxFit.cover,
-                          placeholder: ColoredBox(
-                            color: TravelColors.primary.withValues(alpha: 0.5),
-                            child: const Icon(Icons.landscape_rounded, size: 80, color: Colors.white54),
-                          ),
+                        placeholder: ColoredBox(
+                          color: TravelColors.primary.withValues(alpha: 0.5),
+                          child: const Icon(Icons.landscape_rounded, size: 80, color: Colors.white54),
                         ),
                       ),
                       DecoratedBox(

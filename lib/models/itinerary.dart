@@ -47,6 +47,8 @@ class Itinerary {
     required this.country,
     required this.rating,
     this.province,
+    this.imageUrl,
+    this.imageUrls = const [],
   });
 
   final String id;
@@ -57,9 +59,15 @@ class Itinerary {
   final String country;
   final double rating;
   final String? province;
+  final String? imageUrl;
+  final List<String> imageUrls;
 
   factory Itinerary.fromJson(Map<String, dynamic> json) {
     final raw = json['days'] as List<dynamic>? ?? const [];
+    final urls = (json['image_urls'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .where((e) => e.trim().isNotEmpty)
+        .toList(growable: false);
     return Itinerary(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -71,6 +79,10 @@ class Itinerary {
       country: json['country'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 4.8,
       province: json['province'] as String?,
+      imageUrl: (json['image_url'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : json['image_url'] as String?,
+      imageUrls: urls,
     );
   }
 }
