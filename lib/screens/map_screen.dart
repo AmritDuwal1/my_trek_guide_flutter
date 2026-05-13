@@ -27,6 +27,10 @@ class _MapScreenState extends State<MapScreen> {
   double _zoom = 6.6;
   bool _appliedFocusPlace = false;
 
+  /// At country-scale zoom, drawing every trek `route_path` looks like
+  /// random crossing lines. Show trail polylines only after zooming in.
+  static const double _minZoomForTrekPolylines = 10.0;
+
   Future<void> _openGoogleMapsDirections(NepalPlace place) async {
     final dest = '${place.lat},${place.lng}';
     final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$dest&travelmode=driving');
@@ -287,18 +291,20 @@ class _MapScreenState extends State<MapScreen> {
 
           // Show names on the map (still clustered when zoomed out).
           final showLabel = _zoom >= 8.5;
+          final showTrekPolylines = _zoom >= _minZoomForTrekPolylines;
           final markers = <Marker>[
             for (final p in places) _placeMarker(place: p, showLabel: showLabel),
           ];
 
           final polylines = <Polyline<Object>>[
-            for (final p in places)
-              if (p.type == 'Trek' && p.routePath != null && p.routePath!.length >= 2)
-                Polyline<Object>(
-                  points: p.routePath!.map((e) => LatLng(e.lat, e.lng)).toList(),
-                  strokeWidth: 3.5,
-                  color: TravelColors.accent.withValues(alpha: 0.62),
-                ),
+            if (showTrekPolylines)
+              for (final p in places)
+                if (p.type == 'Trek' && p.routePath != null && p.routePath!.length >= 2)
+                  Polyline<Object>(
+                    points: p.routePath!.map((e) => LatLng(e.lat, e.lng)).toList(),
+                    strokeWidth: 3.5,
+                    color: TravelColors.accent.withValues(alpha: 0.62),
+                  ),
           ];
 
           return Stack(
@@ -437,6 +443,11 @@ class _Legend extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text('Treks'),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Trail lines appear when zoomed in',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: TravelColors.muted),
             ),
           ],
         ),
