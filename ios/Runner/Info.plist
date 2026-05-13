@@ -64,11 +64,15 @@
 	<string>AIzaSyA-j3juLb4myEKv5GtUDQGcrVYrl66W3wA</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Show your position on the trek map while navigating.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>My Trek Guide uses your location to show your position on trek maps and support navigation features while you use the app.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo to identify plants and animals.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a photo to identify plants and animals.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Save identified photos to your library (optional).</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
