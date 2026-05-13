@@ -28,20 +28,247 @@ class _InAppRouteNavigationScreenState extends State<InAppRouteNavigationScreen>
   LatLng? _user;
 
   static const Distance _distCalc = Distance();
+  static const LatLng _kathmandu = LatLng(27.7172, 85.3240);
 
   List<LatLng> get _points => _routePoints(widget.place);
 
-  static List<LatLng> _routePoints(NepalPlace place) {
-    if (place.routePath != null && place.routePath!.length >= 2) {
-      return place.routePath!.map((e) => LatLng(e.lat, e.lng)).toList();
+  static int _dayCountFor(NepalPlace place, List<LatLng> pts) {
+    final dc = place.dayCount;
+    if (dc != null && dc >= 1) return dc;
+    if (pts.length < 3) return 1;
+    return 1;
+  }
+
+  Widget _dayPin({
+    required String label,
+    required bool isLast,
+  }) {
+    final bg = isLast ? TravelColors.navActive : TravelColors.accent;
+    final isMulti = label.length > 2;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(isMulti ? 18 : 999),
+        border: Border.all(color: Colors.white, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: isMulti ? 8 : 0),
+        child: SizedBox(
+          height: 34,
+          width: isMulti ? null : 34,
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Treats coords within ~150 m as the same overnight stop. Avoids
+  /// near-identical curated entries (e.g. "Kyanjin" vs "Tserko Ri side
+  /// hike from Kyanjin") rendering as separate, overlapping pins.
+  bool _sameStop(LatLng a, LatLng b) {
+    return _distCalc.as(LengthUnit.Meter, a, b) < 150;
+  }
+
+  /// Format days for a grouped pin: [5] → "5", [4,5] → "4-5",
+  /// [4,5,7] → "4-5,7".
+  String _formatDayLabel(List<int> days) {
+    if (days.isEmpty) return '';
+    final sorted = List<int>.from(days)..sort();
+    final parts = <String>[];
+    var rangeStart = sorted.first;
+    var prev = sorted.first;
+    for (var i = 1; i <= sorted.length; i++) {
+      final isEnd = i == sorted.length;
+      if (!isEnd && sorted[i] == prev + 1) {
+        prev = sorted[i];
+        continue;
+      }
+      parts.add(rangeStart == prev ? '$rangeStart' : '$rangeStart-$prev');
+      if (!isEnd) {
+        rangeStart = sorted[i];
+        prev = sorted[i];
+      }
     }
-    if (place.type == 'Trek' && place.vehicleLat != null && place.vehicleLng != null) {
+    return parts.join(',');
+  }
+
+  /// Trims the day positions to the outbound leg (start → farthest
+  /// stop, including consecutive same-stop acclimatisation days at
+  /// the peak), then merges co-located days into single pins. Return
+  /// days are intentionally omitted: their villages already have a
+  /// pin from the outbound leg, so showing them again just stacks pins
+  /// and hides earlier days behind later ones.
+  ///
+  /// Important: the *last* day is excluded from "destination" candidates.
+  /// For multi-day treks the last day is almost always a return to
+  /// Kathmandu/Pokhara, which can be geographically farther from the
+  /// trailhead than the real trek destination (e.g. Kathmandu is ~50 km
+  /// south of the Langtang trailhead while Kyanjin Gompa is only ~25 km
+  /// north — without this guard, the algorithm would treat Kathmandu as
+  /// the destination and never trim anything).
+  List<({List<int> days, LatLng pos})> _outboundGroups(List<LatLng> positions) {
+    if (positions.isEmpty) return const [];
+    if (positions.length == 1) {
+      return [(days: [1], pos: positions[0])];
+    }
+
+    final start = positions[0];
+    final searchEnd = positions.length - 1; // exclude trailing return day
+    var bestIdx = 0;
+    var bestKm = 0.0;
+    for (var i = 0; i < searchEnd; i++) {
+      final km = _distCalc.as(LengthUnit.Kilometer, start, positions[i]);
+      // `>=` so ties favour the later day (e.g. Tserko Ri Day 5 beats
+      // Kyanjin Day 4 when both share coords).
+      if (km >= bestKm) {
+        bestKm = km;
+        bestIdx = i;
+      }
+    }
+
+    // Extend through subsequent days that stay at the destination
+    // (acclimatisation/explore days at the peak).
+    var endIdx = bestIdx;
+    while (endIdx + 1 < positions.length &&
+        _sameStop(positions[endIdx + 1], positions[bestIdx])) {
+      endIdx++;
+    }
+
+    final groups = <({List<int> days, LatLng pos})>[];
+    for (var i = 0; i <= endIdx; i++) {
+      final dayNum = i + 1;
+      if (groups.isNotEmpty && _sameStop(groups.last.pos, positions[i])) {
+        groups.last.days.add(dayNum);
+      } else {
+        groups.add((days: [dayNum], pos: positions[i]));
+      }
+    }
+    return groups;
+  }
+
+  List<Marker> _dayMarkers(List<LatLng> pts) {
+    if (pts.isEmpty) return const [];
+    final dc = _dayCountFor(widget.place, pts);
+    if (dc <= 1 || pts.length < 2) {
       return [
-        LatLng(place.vehicleLat!, place.vehicleLng!),
-        LatLng(place.lat, place.lng),
+        Marker(
+          width: 38,
+          height: 38,
+          point: pts.first,
+          alignment: Alignment.center,
+          child: Icon(Icons.place_rounded, color: TravelColors.navActive, size: 34),
+        ),
       ];
     }
-    return [LatLng(place.lat, place.lng)];
+
+    // Prefer curated per-day overnight coordinates from the API. This
+    // makes Day 1, Day 2, … land on the actual village (e.g. EBC:
+    // Phakding, Namche, Tengboche, …). Fallback: even-by-distance
+    // along the polyline so pins still appear 1, 2, 3 in order.
+    final curated = widget.place.dayLocations;
+    final positions = (curated != null && curated.isNotEmpty)
+        ? curated.map((e) => LatLng(e.lat, e.lng)).toList()
+        : _evenlySpacedPositionsByDistance(pts, dc);
+
+    final groups = _outboundGroups(positions);
+
+    final markers = <Marker>[];
+    for (var i = 0; i < groups.length; i++) {
+      final g = groups[i];
+      final label = _formatDayLabel(List<int>.from(g.days));
+      final isLast = i == groups.length - 1;
+      final width = label.length <= 2 ? 38.0 : (label.length * 10.0 + 18.0);
+      markers.add(
+        Marker(
+          width: width,
+          height: 38,
+          point: g.pos,
+          alignment: Alignment.center,
+          child: _dayPin(label: label, isLast: isLast),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  List<LatLng> _evenlySpacedPositionsByDistance(List<LatLng> pts, int count) {
+    if (pts.isEmpty) return const [];
+    if (count <= 1 || pts.length == 1) return [pts.first];
+
+    final segM = <double>[];
+    double totalM = 0;
+    for (var i = 0; i < pts.length - 1; i++) {
+      final m = _distCalc.as(LengthUnit.Meter, pts[i], pts[i + 1]).abs();
+      segM.add(m);
+      totalM += m;
+    }
+    if (totalM <= 1) {
+      return [pts.first, pts.last];
+    }
+
+    LatLng pointAt(double targetM) {
+      var remaining = targetM.clamp(0, totalM);
+      for (var i = 0; i < segM.length; i++) {
+        final m = segM[i];
+        if (remaining <= m || i == segM.length - 1) {
+          final a = pts[i];
+          final b = pts[i + 1];
+          final t = m <= 0 ? 0.0 : (remaining / m).clamp(0.0, 1.0);
+          return LatLng(
+            a.latitude + (b.latitude - a.latitude) * t,
+            a.longitude + (b.longitude - a.longitude) * t,
+          );
+        }
+        remaining -= m;
+      }
+      return pts.last;
+    }
+
+    final out = <LatLng>[];
+    for (var i = 0; i < count; i++) {
+      final t = (count == 1) ? 0.0 : i / (count - 1);
+      out.add(pointAt(totalM * t));
+    }
+    return out;
+  }
+
+  static List<LatLng> _routePoints(NepalPlace place) {
+    // For treks, route starts from Kathmandu so users see where the
+    // trip actually originates rather than dropping into a remote
+    // trailhead.
+    final pts = <LatLng>[];
+    if (place.type == 'Trek') {
+      pts.add(_kathmandu);
+    }
+    if (place.routePath != null && place.routePath!.length >= 2) {
+      pts.addAll(place.routePath!.map((e) => LatLng(e.lat, e.lng)));
+      return pts;
+    }
+    if (place.type == 'Trek' && place.vehicleLat != null && place.vehicleLng != null) {
+      pts.addAll([
+        LatLng(place.vehicleLat!, place.vehicleLng!),
+        LatLng(place.lat, place.lng),
+      ]);
+      return pts;
+    }
+    pts.add(LatLng(place.lat, place.lng));
+    return pts;
   }
 
   double _polylineLengthKm(List<LatLng> pts) {
@@ -151,20 +378,7 @@ class _InAppRouteNavigationScreenState extends State<InAppRouteNavigationScreen>
     final remainingKm = _user != null && pts.length >= 2 ? _remainingKmAlongPolyline(pts, _user!) : null;
 
     final markers = <Marker>[
-      Marker(
-        width: 36,
-        height: 36,
-        point: pts.first,
-        alignment: Alignment.center,
-        child: Icon(Icons.flag_rounded, color: Colors.green.shade700, size: 30),
-      ),
-      Marker(
-        width: 36,
-        height: 36,
-        point: pts.last,
-        alignment: Alignment.center,
-        child: Icon(Icons.place_rounded, color: TravelColors.navActive, size: 34),
-      ),
+      ..._dayMarkers(pts),
     ];
 
     final u = _user;
