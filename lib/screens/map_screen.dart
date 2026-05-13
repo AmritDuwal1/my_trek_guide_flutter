@@ -10,7 +10,11 @@ import 'package:tour_mobile/widgets/api_offline_block.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.focusPlaceId});
+
+  /// When set (e.g. from an itinerary detail), the map centers on this place
+  /// after places load and opens the same sheet as tapping the marker.
+  final String? focusPlaceId;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -21,6 +25,7 @@ class _MapScreenState extends State<MapScreen> {
   late Future<List<NepalPlace>> _future;
   final _mapController = MapController();
   double _zoom = 6.6;
+  bool _appliedFocusPlace = false;
 
   Future<void> _openGoogleMapsDirections(NepalPlace place) async {
     final dest = '${place.lat},${place.lng}';
@@ -37,13 +42,26 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _future = _service.fetchNepalPlaces();
+    _wirePlacesFuture(_future);
+  }
+
+  void _wirePlacesFuture(Future<List<NepalPlace>> f) {
+    f.then((places) {
+      if (!mounted || !identical(f, _future)) return;
+      _maybeFocusPlace(places);
+    });
   }
 
   Future<void> _reload() async {
+    final f = _service.fetchNepalPlaces();
     setState(() {
-      _future = _service.fetchNepalPlaces();
+      _future = f;
+      if (widget.focusPlaceId != null) {
+        _appliedFocusPlace = false;
+      }
     });
-    await _future;
+    _wirePlacesFuture(f);
+    await f;
   }
 
   ({Color color, IconData icon}) _styleForPlace(NepalPlace p) {
@@ -141,6 +159,36 @@ class _MapScreenState extends State<MapScreen> {
         child: pin,
       ),
     );
+  }
+
+  void _maybeFocusPlace(List<NepalPlace> places) {
+    final id = widget.focusPlaceId;
+    if (id == null || id.isEmpty || _appliedFocusPlace) return;
+    NepalPlace? match;
+    for (final p in places) {
+      if (p.id == id) {
+        match = p;
+        break;
+      }
+    }
+    if (match == null) {
+      _appliedFocusPlace = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This place could not be found on the map.')),
+        );
+      });
+      return;
+    }
+    _appliedFocusPlace = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final point = LatLng(match!.lat, match.lng);
+      _mapController.move(point, 12);
+      setState(() => _zoom = 12);
+      _showPlaceSheet(match);
+    });
   }
 
   void _showPlaceSheet(NepalPlace place) {

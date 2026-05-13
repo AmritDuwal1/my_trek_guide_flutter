@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/models/itinerary.dart';
 import 'package:tour_mobile/auth/auth_required.dart';
+import 'package:tour_mobile/screens/map_screen.dart';
 import 'package:tour_mobile/services/favorites_service.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
 import 'package:tour_mobile/theme/cover_image.dart';
@@ -96,6 +97,24 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen> {
                   ),
                 ),
                 actions: [
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: 'View on map',
+                        icon: const Icon(Icons.map_rounded, color: Colors.white),
+                        onPressed: () {
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) => MapScreen(focusPlaceId: widget.itineraryId),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.all(8),
                     child: Material(
@@ -222,6 +241,28 @@ class _ItineraryDetailScreenState extends State<ItineraryDetailScreen> {
                                   color: TravelColors.muted,
                                   height: 1.45,
                                 ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.tonalIcon(
+                              onPressed: () {
+                                Navigator.of(context).push<void>(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => MapScreen(focusPlaceId: it.id),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.map_rounded),
+                              label: const Text('View on map'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                alignment: Alignment.center,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 28),
                           Text(
