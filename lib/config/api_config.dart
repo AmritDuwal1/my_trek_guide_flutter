@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 /// Override with:
 /// `flutter run --dart-define=IS_LIVE=true`
 // const bool isLive = bool.fromEnvironment('IS_LIVE', defaultValue: kReleaseMode);
-const bool isLive = bool.fromEnvironment('IS_LIVE', defaultValue: false);
+const bool isLive = bool.fromEnvironment('IS_LIVE', defaultValue: true);
 
 /// Base URL for the Python API (`api/`). Android emulator uses the host loopback alias.
 String apiBaseUrl() {
