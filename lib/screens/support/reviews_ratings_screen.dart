@@ -11,8 +11,8 @@ class ReviewsRatingsScreen extends StatelessWidget {
     final Uri uri = kIsWeb
         ? Uri.parse('https://example.com')
         : (defaultTargetPlatform == TargetPlatform.iOS)
-            ? Uri.parse('https://apps.apple.com/app/id0000000000?action=write-review')
-            : Uri.parse('https://play.google.com/store/apps/details?id=com.tour.tour_mobile&reviewId=0');
+            ? Uri.parse('https://apps.apple.com/app/id6767486121?action=write-review')
+            : Uri.parse('https://play.google.com/store/apps/details?id=com.mytrekguide.app&reviewId=0');
 
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && context.mounted) {
