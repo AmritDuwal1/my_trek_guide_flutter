@@ -79,6 +79,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Install App Store provisioning profile
+        id: mobile_profile
         env:
           APPSTORE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPSTORE_PROVISIONING_PROFILE_BASE64 }}
         run: |
@@ -112,6 +113,10 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/"$UUID".mobileprovision
 
+          echo "profile_name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "profile_uuid=$UUID" >> "$GITHUB_OUTPUT"
+          echo "team_id=$TEAM_ID" >> "$GITHUB_OUTPUT"
+
           cat > ios/ExportOptions.generated.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -135,6 +140,23 @@ jobs:
           </dict>
           </plist>
           EOF
+
+      - name: Configure manual code signing for CI
+        env:
+          PROFILE_NAME: ${{ steps.mobile_profile.outputs.profile_name }}
+          PROFILE_UUID: ${{ steps.mobile_profile.outputs.profile_uuid }}
+          TEAM_ID: ${{ steps.mobile_profile.outputs.team_id }}
+        run: |
+          PBX=ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' \
+            -e 's/CODE_SIGN_IDENTITY = "Apple Development";/CODE_SIGN_IDENTITY = "Apple Distribution";/g' \
+            -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
+            -e 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "iPhone Developer";/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";/g' \
+            "$PBX"
+          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\";/PROVISIONING_PROFILE_SPECIFIER = \"${PROFILE_NAME}\";/g" "$PBX"
+          sed -i '' "s/DEVELOPMENT_TEAM = SQV87MQH24;/DEVELOPMENT_TEAM = ${TEAM_ID};/g" "$PBX"
+          echo "Code signing identities available to Xcode:"
+          security find-identity -v -p codesigning
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
