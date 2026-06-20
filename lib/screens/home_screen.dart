@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:tour_mobile/models/itinerary.dart';
 import 'package:tour_mobile/notifications/notification_store.dart';
+import 'package:tour_mobile/screens/country_picker_screen.dart';
 import 'package:tour_mobile/screens/itinerary_detail_screen.dart';
 import 'package:tour_mobile/screens/notifications_screen.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
+import 'package:tour_mobile/stores/country_store.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 import 'package:tour_mobile/widgets/api_offline_block.dart';
 import 'package:tour_mobile/widgets/browse_categories_row.dart';
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _service = ItineraryService();
   final _notifications = NotificationStore.instance;
+  final _countryStore = CountryStore.instance;
   late Future<List<Itinerary>> _future;
 
   ExploreCitiesTab _exploreTab = ExploreCitiesTab.popular;
@@ -35,20 +38,39 @@ class _HomeScreenState extends State<HomeScreen> {
     BrowseCategory(id: 'heritage', label: 'Heritage', imageSeed: 'templenp'),
     BrowseCategory(id: 'wild', label: 'Wildlife', imageSeed: 'rhino'),
     BrowseCategory(id: 'lake', label: 'Lakes', imageSeed: 'phewatal'),
+    BrowseCategory(id: 'beach', label: 'Beaches', imageSeed: 'beach'),
+    BrowseCategory(id: 'city', label: 'Cities', imageSeed: 'city'),
   ];
 
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchItineraries();
+    _loadForCurrentCountry();
     _notifications.ensureLoaded();
+    _countryStore.addListener(_onCountryChanged);
+  }
+
+  @override
+  void dispose() {
+    _countryStore.removeListener(_onCountryChanged);
+    super.dispose();
+  }
+
+  void _onCountryChanged() {
+    _loadForCurrentCountry();
+  }
+
+  void _loadForCurrentCountry() {
+    setState(() {
+      _future = _service.fetchItineraries(
+        countryCode: _countryStore.selected.code,
+      );
+    });
   }
 
   Future<void> _reload() async {
-    setState(() {
-      _future = _service.fetchItineraries();
-      UserSessionStore.bumpRevision();
-    });
+    _loadForCurrentCountry();
+    UserSessionStore.bumpRevision();
     await _future;
   }
 
@@ -67,18 +89,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openCountryPicker() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const CountryPickerScreen()),
+    );
+  }
+
   bool _matchesBrowse(Itinerary it, String? browseId) {
     if (browseId == null) return true;
-    final c = it.category;
+    final c = it.category.toLowerCase();
     switch (browseId) {
       case 'trek':
-        return c == 'Trek';
+        return c == 'trek';
       case 'heritage':
-        return c == 'Heritage';
+        return c == 'heritage';
       case 'wild':
-        return c == 'National Park';
+        return c == 'national park';
       case 'lake':
-        return c == 'Lake';
+        return c == 'lake';
+      case 'beach':
+        return c == 'beach' || c == 'island';
+      case 'city':
+        return c == 'city';
       default:
         return true;
     }
@@ -192,6 +224,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: TravelColors.ink,
                             ),
                       ),
+                      const SizedBox(height: 14),
+                      // ── Country selector chip ──────────────────────────
+                      ListenableBuilder(
+                        listenable: _countryStore,
+                        builder: (context, _) => _CountryChip(
+                          country: _countryStore.selected.name,
+                          emoji: _countryStore.selected.emoji,
+                          onTap: _openCountryPicker,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -268,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 22),
                   child: Text(
-                    'Explore Cities',
+                    'Explore Places',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           fontSize: 18,
@@ -289,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
                         child: Text(
-                          'No cities match this filter.',
+                          'No places match this filter.',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: TravelColors.muted),
                         ),
                       )
@@ -345,6 +387,55 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Country chip ─────────────────────────────────────────────────────────────
+
+class _CountryChip extends StatelessWidget {
+  const _CountryChip({
+    required this.country,
+    required this.emoji,
+    required this.onTap,
+  });
+
+  final String country;
+  final String emoji;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: TravelColors.navActive.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: TravelColors.navActive.withValues(alpha: 0.3),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Text(
+              country,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: TravelColors.navActive,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more_rounded,
+                size: 16, color: TravelColors.navActive),
+          ],
+        ),
+      ),
     );
   }
 }

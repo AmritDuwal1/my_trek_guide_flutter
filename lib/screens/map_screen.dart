@@ -3,8 +3,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:tour_mobile/models/nepal_place.dart';
+import 'package:tour_mobile/models/world_place.dart';
+import 'package:tour_mobile/screens/country_picker_screen.dart';
 import 'package:tour_mobile/screens/map/in_app_route_navigation_screen.dart';
 import 'package:tour_mobile/services/itinerary_service.dart';
+import 'package:tour_mobile/services/place_service.dart';
+import 'package:tour_mobile/stores/country_store.dart';
 import 'package:tour_mobile/theme/travel_theme.dart';
 import 'package:tour_mobile/widgets/api_offline_block.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,8 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.focusPlaceId});
 
-  /// When set (e.g. from an itinerary detail), the map centers on this place
-  /// after places load and opens the same sheet as tapping the marker.
+  /// When set (e.g. from an itinerary detail), the map centers on this place.
   final String? focusPlaceId;
 
   @override
@@ -21,82 +24,124 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final _service = ItineraryService();
-  late Future<List<NepalPlace>> _future;
+  final _itineraryService = ItineraryService();
+  final _placeService = PlaceService();
+  final _countryStore = CountryStore.instance;
+  late Future<List<WorldPlace>> _future;
   final _mapController = MapController();
-  double _zoom = 6.6;
+  double _zoom = 5.0;
   bool _appliedFocusPlace = false;
 
-  /// At country-scale zoom, drawing every trek `route_path` looks like
-  /// random crossing lines. Show trail polylines only after zooming in.
   static const double _minZoomForTrekPolylines = 10.0;
-
-  Future<void> _openGoogleMapsDirections(NepalPlace place) async {
-    final dest = '${place.lat},${place.lng}';
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$dest&travelmode=driving');
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Google Maps.')),
-      );
-    }
-  }
 
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchNepalPlaces();
-    _wirePlacesFuture(_future);
+    _zoom = _defaultZoomForCountry(_countryStore.selected.code);
+    _loadForCurrentCountry();
+    _countryStore.addListener(_onCountryChanged);
   }
 
-  void _wirePlacesFuture(Future<List<NepalPlace>> f) {
+  @override
+  void dispose() {
+    _countryStore.removeListener(_onCountryChanged);
+    super.dispose();
+  }
+
+  void _onCountryChanged() {
+    setState(() {
+      _zoom = _defaultZoomForCountry(_countryStore.selected.code);
+      _appliedFocusPlace = false;
+    });
+    _loadForCurrentCountry();
+  }
+
+  double _defaultZoomForCountry(String code) {
+    // Larger countries get lower initial zoom
+    const large = {'US', 'CA', 'BR', 'AU', 'CN', 'IN'};
+    const medium = {'FR', 'ES', 'DE', 'TR', 'ZA', 'MX', 'PE'};
+    if (large.contains(code)) return 4.0;
+    if (medium.contains(code)) return 5.2;
+    return 6.2;
+  }
+
+  void _loadForCurrentCountry() {
+    final code = _countryStore.selected.code;
+    Future<List<WorldPlace>> f;
+    if (code == 'NP') {
+      f = _itineraryService.fetchNepalPlaces().then((places) =>
+          places.map((p) => WorldPlace(
+                id: p.id,
+                name: p.name,
+                countryCode: 'NP',
+                region: p.province,
+                type: p.type,
+                summary: p.summary,
+                lat: p.lat,
+                lng: p.lng,
+              )).toList());
+    } else {
+      f = _placeService.fetchWorldPlaces(code);
+    }
+    setState(() => _future = f);
     f.then((places) {
-      if (!mounted || !identical(f, _future)) return;
+      if (!mounted) return;
       _maybeFocusPlace(places);
+      _centerOnCountry();
+    }).catchError((_) {});
+  }
+
+  void _centerOnCountry() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final c = _countryStore.selected;
+      _mapController.move(LatLng(c.lat, c.lng), _zoom);
     });
   }
 
   Future<void> _reload() async {
-    final f = _service.fetchNepalPlaces();
-    setState(() {
-      _future = f;
-      if (widget.focusPlaceId != null) {
-        _appliedFocusPlace = false;
-      }
-    });
-    _wirePlacesFuture(f);
-    await f;
+    setState(() => _appliedFocusPlace = false);
+    _loadForCurrentCountry();
+    await _future;
   }
 
-  ({Color color, IconData icon}) _styleForPlace(NepalPlace p) {
-    final t = p.type.trim().toLowerCase();
-    if (t == 'trek') {
-      return (color: TravelColors.accent, icon: Icons.hiking_rounded);
+  // ── Place styling ─────────────────────────────────────────────────────────
+
+  ({Color color, IconData icon}) _styleForType(String type) {
+    switch (type.trim().toLowerCase()) {
+      case 'trek':
+        return (color: TravelColors.accent, icon: Icons.hiking_rounded);
+      case 'heritage':
+        return (color: const Color(0xFFFB8C00), icon: Icons.account_balance_rounded);
+      case 'national park':
+        return (color: const Color(0xFF43A047), icon: Icons.forest_rounded);
+      case 'lake':
+        return (color: const Color(0xFF00ACC1), icon: Icons.water_rounded);
+      case 'beach':
+        return (color: const Color(0xFF039BE5), icon: Icons.beach_access_rounded);
+      case 'island':
+        return (color: const Color(0xFF0097A7), icon: Icons.sailing_rounded);
+      case 'pilgrimage':
+        return (color: const Color(0xFFE65100), icon: Icons.temple_hindu_rounded);
+      case 'city':
+        return (color: const Color(0xFF5E35B1), icon: Icons.location_city_rounded);
+      case 'viewpoint':
+        return (color: const Color(0xFF546E7A), icon: Icons.landscape_rounded);
+      case 'adventure':
+        return (color: const Color(0xFFE53935), icon: Icons.kayaking_rounded);
+      case 'hill station':
+        return (color: const Color(0xFF6D4C41), icon: Icons.cottage_rounded);
+      default:
+        return (color: TravelColors.navActive, icon: Icons.place_rounded);
     }
-    if (t.contains('hotel') || t.contains('lodge') || t.contains('guest')) {
-      return (color: const Color(0xFF7C4DFF), icon: Icons.hotel_rounded);
-    }
-    if (t.contains('waterfall') || t.contains('falls')) {
-      return (color: const Color(0xFF1E88E5), icon: Icons.waterfall_chart_rounded);
-    }
-    if (t.contains('lake')) {
-      return (color: const Color(0xFF00ACC1), icon: Icons.water_rounded);
-    }
-    if (t.contains('temple') || t.contains('monastery') || t.contains('stupa')) {
-      return (color: const Color(0xFFFB8C00), icon: Icons.temple_buddhist_rounded);
-    }
-    if (t.contains('view') || t.contains('peak') || t.contains('summit')) {
-      return (color: const Color(0xFF546E7A), icon: Icons.landscape_rounded);
-    }
-    return (color: TravelColors.navActive, icon: Icons.place_rounded);
   }
 
   Marker _placeMarker({
-    required NepalPlace place,
+    required WorldPlace place,
     required bool showLabel,
     double size = 42,
   }) {
-    final style = _styleForPlace(place);
+    final style = _styleForType(place.type);
     final point = LatLng(place.lat, place.lng);
 
     Widget pin = DecoratedBox(
@@ -145,7 +190,10 @@ class _MapScreenState extends State<MapScreen> {
                 place.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: TravelColors.ink),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: TravelColors.ink),
               ),
             ),
           ),
@@ -165,10 +213,12 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _maybeFocusPlace(List<NepalPlace> places) {
+  // ── Focus ─────────────────────────────────────────────────────────────────
+
+  void _maybeFocusPlace(List<WorldPlace> places) {
     final id = widget.focusPlaceId;
     if (id == null || id.isEmpty || _appliedFocusPlace) return;
-    NepalPlace? match;
+    WorldPlace? match;
     for (final p in places) {
       if (p.id == id) {
         match = p;
@@ -180,7 +230,8 @@ class _MapScreenState extends State<MapScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This place could not be found on the map.')),
+          const SnackBar(
+              content: Text('This place could not be found on the map.')),
         );
       });
       return;
@@ -195,8 +246,23 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _showPlaceSheet(NepalPlace place) {
+  // ── Bottom sheet ──────────────────────────────────────────────────────────
+
+  Future<void> _openGoogleMaps(double lat, double lng) async {
+    final uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Google Maps.')),
+      );
+    }
+  }
+
+  void _showPlaceSheet(WorldPlace place) {
     final nav = Navigator.of(context);
+    final isNepal = place.countryCode == 'NP';
+
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -206,56 +272,82 @@ class _MapScreenState extends State<MapScreen> {
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 place.name,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
-                '${place.type} · ${place.province}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: TravelColors.muted),
+                '${place.type} · ${place.region}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: TravelColors.muted),
               ),
               const SizedBox(height: 10),
               Text(
                 place.summary,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(height: 1.4),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               Row(
                 children: [
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        nav.pop();
-                        nav.push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => InAppRouteNavigationScreen(place: place),
-                          ),
-                        );
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: TravelColors.navActive,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  if (isNepal)
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () async {
+                          // Fetch the full NepalPlace for in-app navigation
+                          nav.pop();
+                          final itService = ItineraryService();
+                          final places = await itService.fetchNepalPlaces();
+                          if (!mounted) return;
+                          NepalPlace? np;
+                          try {
+                            np = places.firstWhere((p) => p.id == place.id);
+                          } catch (_) {}
+                          if (np != null && mounted) {
+                            nav.push(MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  InAppRouteNavigationScreen(place: np!),
+                            ));
+                          }
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: TravelColors.navActive,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('In-app nav'),
                       ),
-                      child: const Text('In-app'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
+                  if (isNepal) const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
                         nav.pop();
-                        await _openGoogleMapsDirections(place);
+                        await _openGoogleMaps(place.lat, place.lng);
                       },
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 14),
+                        side: const BorderSide(color: TravelColors.line),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
                       ),
                       child: const Text('Google Maps'),
                     ),
@@ -269,148 +361,185 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: TravelColors.canvas,
-      child: FutureBuilder<List<NepalPlace>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: TravelColors.navActive));
-          }
-          if (snapshot.hasError) {
-            return ApiOfflineBlock(onRetry: _reload);
-          }
-          final places = snapshot.data ?? const <NepalPlace>[];
-          if (places.isEmpty) {
-            return Center(child: Text('No places to show.', style: Theme.of(context).textTheme.bodyLarge));
-          }
+    return ListenableBuilder(
+      listenable: _countryStore,
+      builder: (context, _) {
+        return ColoredBox(
+          color: TravelColors.canvas,
+          child: FutureBuilder<List<WorldPlace>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                    child: CircularProgressIndicator(
+                        color: TravelColors.navActive));
+              }
+              if (snapshot.hasError) {
+                return ApiOfflineBlock(onRetry: _reload);
+              }
+              final places = snapshot.data ?? const <WorldPlace>[];
 
-          final center = const LatLng(28.3949, 84.1240); // Nepal centroid-ish
+              final country = _countryStore.selected;
+              final center = LatLng(country.lat, country.lng);
+              final showLabel = _zoom >= 8.5;
+              final showTrekPolylines = _zoom >= _minZoomForTrekPolylines;
 
-          // Show names on the map (still clustered when zoomed out).
-          final showLabel = _zoom >= 8.5;
-          final showTrekPolylines = _zoom >= _minZoomForTrekPolylines;
-          final markers = <Marker>[
-            for (final p in places) _placeMarker(place: p, showLabel: showLabel),
-          ];
+              final markers = <Marker>[
+                for (final p in places)
+                  _placeMarker(place: p, showLabel: showLabel),
+              ];
 
-          final polylines = <Polyline<Object>>[
-            if (showTrekPolylines)
-              for (final p in places)
-                if (p.type == 'Trek' && p.routePath != null && p.routePath!.length >= 2)
-                  Polyline<Object>(
-                    points: p.routePath!.map((e) => LatLng(e.lat, e.lng)).toList(),
-                    strokeWidth: 3.5,
-                    color: TravelColors.accent.withValues(alpha: 0.62),
-                  ),
-          ];
-
-          return Stack(
-            children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: 6.6,
-                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
-                  onPositionChanged: (pos, _) {
-                    final z = pos.zoom;
-                    if ((z - _zoom).abs() >= 0.05) {
-                      setState(() => _zoom = z);
-                    }
-                  },
-                ),
+              return Stack(
                 children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.tour.tour_mobile',
-                  ),
-                  if (polylines.isNotEmpty) PolylineLayer(polylines: polylines),
-                  MarkerClusterLayerWidget(
-                    options: MarkerClusterLayerOptions(
-                      markers: markers,
-                      maxClusterRadius: 55,
-                      size: const Size(44, 44),
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.all(50),
-                      disableClusteringAtZoom: 14,
-                      showPolygon: false,
-                      builder: (context, clustered) {
-                        return DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: TravelColors.navActive.withValues(alpha: 0.92),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.18),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${clustered.length}',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                        );
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: center,
+                      initialZoom: _zoom,
+                      interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all),
+                      onPositionChanged: (pos, _) {
+                        final z = pos.zoom;
+                        if ((z - _zoom).abs() >= 0.05) {
+                          setState(() => _zoom = z);
+                        }
                       },
                     ),
-                  ),
-                ],
-              ),
-              Positioned(
-                left: 16,
-                right: 16,
-                top: MediaQuery.paddingOf(context).top + 12,
-                child: Row(
-                  children: [
-                    Material(
-                      color: TravelColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      elevation: 2,
-                      shadowColor: Colors.black.withValues(alpha: 0.08),
-                      child: IconButton(
-                        onPressed: _reload,
-                        icon: const Icon(Icons.refresh_rounded),
-                        tooltip: 'Reload',
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.tour.tour_mobile',
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Material(
-                        color: TravelColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        elevation: 2,
-                        shadowColor: Colors.black.withValues(alpha: 0.08),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Text(
-                            '${places.length} places in Nepal',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                          ),
+                      if (showTrekPolylines && places.isNotEmpty)
+                        PolylineLayer<Object>(polylines: const []),
+                      MarkerClusterLayerWidget(
+                        options: MarkerClusterLayerOptions(
+                          markers: markers,
+                          maxClusterRadius: 55,
+                          size: const Size(44, 44),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.all(50),
+                          disableClusteringAtZoom: 14,
+                          showPolygon: false,
+                          builder: (context, clustered) {
+                            return DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: TravelColors.navActive
+                                    .withValues(alpha: 0.92),
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${clustered.length}',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
+                    ],
+                  ),
+                  // Top bar
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: MediaQuery.paddingOf(context).top + 12,
+                    child: Row(
+                      children: [
+                        Material(
+                          color: TravelColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          elevation: 2,
+                          shadowColor: Colors.black.withValues(alpha: 0.08),
+                          child: IconButton(
+                            onPressed: _reload,
+                            icon: const Icon(Icons.refresh_rounded),
+                            tooltip: 'Reload',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              await Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const CountryPickerScreen(),
+                                ),
+                              );
+                            },
+                            child: Material(
+                              color: TravelColors.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              elevation: 2,
+                              shadowColor:
+                                  Colors.black.withValues(alpha: 0.08),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 11),
+                                child: Row(
+                                  children: [
+                                    Text(country.emoji,
+                                        style:
+                                            const TextStyle(fontSize: 18)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${places.length} places · ${country.name}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.w700),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const Icon(Icons.expand_more_rounded,
+                                        size: 18, color: TravelColors.muted),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              Positioned(
-                left: 16,
-                bottom: 18,
-                child: _Legend(),
-              ),
-            ],
-          );
-        },
-      ),
+                  ),
+                  // Legend
+                  Positioned(
+                    left: 16,
+                    bottom: 18,
+                    child: _Legend(),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
+
+// ── Legend ────────────────────────────────────────────────────────────────────
 
 class _Legend extends StatelessWidget {
   @override
@@ -425,30 +554,30 @@ class _Legend extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Legend', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text('Map legend',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _Dot(color: TravelColors.navActive),
-                const SizedBox(width: 8),
-                const Text('Places'),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _Dot(color: TravelColors.accent),
-                const SizedBox(width: 8),
-                const Text('Treks'),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Trail lines appear when zoomed in',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: TravelColors.muted),
-            ),
+            for (final entry in const [
+              MapEntry(TravelColors.navActive, 'Places'),
+              MapEntry(TravelColors.accent, 'Treks'),
+              MapEntry(Color(0xFF039BE5), 'Beaches'),
+              MapEntry(Color(0xFF5E35B1), 'Cities'),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _Dot(color: entry.key),
+                    const SizedBox(width: 8),
+                    Text(entry.value,
+                        style: Theme.of(context).textTheme.labelSmall),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -469,4 +598,3 @@ class _Dot extends StatelessWidget {
     );
   }
 }
-

@@ -13,8 +13,16 @@ class ItineraryService {
 
   Uri _uri(String path) => Uri.parse('${apiBaseUrl()}$path');
 
-  Future<List<Itinerary>> fetchItineraries() async {
-    final res = await _client.get(_uri('/itineraries'));
+  Future<List<Itinerary>> fetchItineraries({String? countryCode}) async {
+    Uri uri;
+    if (countryCode != null && countryCode.isNotEmpty) {
+      uri = _uri('/itineraries/').replace(
+        queryParameters: {'country': countryCode.toUpperCase()},
+      );
+    } else {
+      uri = _uri('/itineraries/');
+    }
+    final res = await _client.get(uri);
     if (res.statusCode != 200) {
       throw Exception('Failed to load itineraries (${res.statusCode})');
     }
