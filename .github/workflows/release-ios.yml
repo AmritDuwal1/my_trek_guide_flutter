@@ -12,17 +12,23 @@
 # Provisioning profile must match bundle ID: com.mytrekguide.app
 # Encode profile: base64 -i YourProfile.mobileprovision | pbcopy
 #
-# Run manually: Actions → Release iOS (TestFlight) → Run workflow
+# Triggers: every push to main/master, or manually from Actions tab.
 
 name: Release iOS (TestFlight)
 
 on:
+  push:
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       build_number:
         description: "Optional build number override (leave blank to use pubspec)"
         required: false
         type: string
+
+concurrency:
+  group: release-ios-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   IOS_BUNDLE_ID: com.mytrekguide.app
