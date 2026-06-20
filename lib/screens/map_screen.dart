@@ -83,11 +83,15 @@ class _MapScreenState extends State<MapScreen> {
     } else {
       f = _placeService.fetchWorldPlaces(code);
     }
-    setState(() => _future = f);
+    setState(() {
+      _future = f;
+    });
     f.then((places) {
       if (!mounted) return;
       _maybeFocusPlace(places);
-      _centerOnCountry();
+      if (widget.focusPlaceId == null || widget.focusPlaceId!.isEmpty) {
+        _fitMapToPlaces(places);
+      }
     }).catchError((_) {});
   }
 
@@ -96,6 +100,31 @@ class _MapScreenState extends State<MapScreen> {
       if (!mounted) return;
       final c = _countryStore.selected;
       _mapController.move(LatLng(c.lat, c.lng), _zoom);
+    });
+  }
+
+  void _fitMapToPlaces(List<WorldPlace> places) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (places.isEmpty) {
+        _centerOnCountry();
+        return;
+      }
+      if (places.length == 1) {
+        final p = places.first;
+        _mapController.move(LatLng(p.lat, p.lng), 10);
+        setState(() {
+          _zoom = 10;
+        });
+        return;
+      }
+      final coords = places.map((p) => LatLng(p.lat, p.lng)).toList();
+      _mapController.fitCamera(
+        CameraFit.coordinates(
+          coordinates: coords,
+          padding: const EdgeInsets.only(top: 120, bottom: 100, left: 32, right: 32),
+        ),
+      );
     });
   }
 
