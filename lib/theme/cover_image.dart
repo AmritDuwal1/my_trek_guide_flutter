@@ -1,8 +1,8 @@
-/// Hero image per itinerary.
-///
-/// Prefer the explicit `image_url` / `image_urls` provided by the API
-/// (canonical Wikipedia / Wikimedia Commons photo of the specific place).
-/// Fall back to keyword-based search only when no explicit URL is available.
+// Hero image per itinerary.
+//
+// Prefer the explicit `image_url` / `image_urls` provided by the API
+// (canonical Wikipedia / Wikimedia Commons photo of the specific place).
+// Fall back to keyword-based search only when no explicit URL is available.
 
 /// Single URL for the cover, falling back to the keyword-based default.
 String itineraryCoverUrl(String itineraryId, {String? explicitUrl}) {

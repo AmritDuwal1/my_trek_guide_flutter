@@ -33,6 +33,7 @@ class ProfileScreen extends StatelessWidget {
       },
     );
     if (ok != true) return;
+    if (!context.mounted) return;
 
     showDialog<void>(
       context: context,
