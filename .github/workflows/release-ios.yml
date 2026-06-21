@@ -7,9 +7,10 @@
 #   APPSTORE_PROVISIONING_PROFILE_BASE64 — base64 of App Store .mobileprovision
 #   APPSTORE_ISSUER_ID                 — App Store Connect API Issuer ID (TestFlight upload)
 #   APPSTORE_API_KEY_ID                — App Store Connect API Key ID
-#   APPSTORE_API_PRIVATE_KEY           — full contents of AuthKey_XXXX.p8
+#   APPSTORE_API_PRIVATE_KEY           — full contents of AuthKey_XXXX.p8 (App Manager role)
 #
-# Provisioning profile must match bundle ID: com.mytrekguide.app
+# API key must belong to the SAME team as the app (SQV87MQH24 / com.mytrekguide.app).
+# Create the app in App Store Connect before the first upload.
 # Encode profile: base64 -i YourProfile.mobileprovision | pbcopy
 #
 # Triggers: every push to main/master, or manually from Actions tab.
@@ -193,6 +194,78 @@ jobs:
           echo "path=$IPA" >> "$GITHUB_OUTPUT"
           echo "Built: $IPA"
 
+      - name: Verify IPA bundle and signature
+        run: |
+          IPA="${{ steps.ipa.outputs.path }}"
+          TMP=$(mktemp -d)
+          unzip -q "$IPA" -d "$TMP"
+          APP=$(find "$TMP/Payload" -maxdepth 1 -name '*.app' -print -quit)
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Info.plist")
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Info.plist")
+          echo "IPA bundle ID: $BUNDLE_ID"
+          echo "IPA version: $VERSION ($BUILD_NUMBER)"
+          if [ "$BUNDLE_ID" != "$IOS_BUNDLE_ID" ]; then
+            echo "::error::IPA bundle ID is '$BUNDLE_ID' but expected '$IOS_BUNDLE_ID'."
+            exit 1
+          fi
+          codesign -dvvv "$APP" 2>&1 | grep -E 'Authority=|TeamIdentifier=|Identifier=' || true
+
+      - name: Validate App Store Connect API key
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APPSTORE_ISSUER_ID" ] || [ -z "$APPSTORE_API_KEY_ID" ] || [ -z "$APPSTORE_API_PRIVATE_KEY" ]; then
+            echo "::error::APPSTORE_ISSUER_ID, APPSTORE_API_KEY_ID, and APPSTORE_API_PRIVATE_KEY are required."
+            exit 1
+          fi
+          python3 -m pip install --quiet pyjwt cryptography
+          python3 <<'PY'
+          import json, os, time, urllib.error, urllib.request
+          import jwt
+
+          key_id = os.environ["APPSTORE_API_KEY_ID"].strip()
+          issuer_id = os.environ["APPSTORE_ISSUER_ID"].strip()
+          private_key = os.environ["APPSTORE_API_PRIVATE_KEY"]
+          bundle_id = os.environ["IOS_BUNDLE_ID"]
+
+          token = jwt.encode(
+              {
+                  "iss": issuer_id,
+                  "iat": int(time.time()),
+                  "exp": int(time.time()) + 1200,
+                  "aud": "appstoreconnect-v1",
+              },
+              private_key,
+              algorithm="ES256",
+              headers={"kid": key_id, "typ": "JWT"},
+          )
+
+          url = f"https://api.appstoreconnect.apple.com/v1/apps?filter[bundleId]={bundle_id}"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  data = json.load(resp)
+          except urllib.error.HTTPError as exc:
+              body = exc.read().decode()
+              print(f"::error::App Store Connect API rejected credentials ({exc.code}).")
+              print(body)
+              if exc.code == 401:
+                  print("Fix: use an API key from the team that owns com.mytrekguide.app (SQV87MQH24), with App Manager role.")
+              raise SystemExit(1) from exc
+
+          apps = data.get("data", [])
+          if not apps:
+              print(f"::error::No app found in App Store Connect for bundle ID {bundle_id}.")
+              print("Fix: App Store Connect → Apps → + → New App → bundle ID com.mytrekguide.app")
+              raise SystemExit(1)
+
+          attrs = apps[0]["attributes"]
+          print(f"App Store Connect app OK: {attrs.get('name')} (id={apps[0]['id']}, sku={attrs.get('sku')})")
+          PY
+
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v5
         with:
@@ -200,6 +273,9 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          backend: transporter
+          uses-non-exempt-encryption: "false"
+          wait-for-processing: "false"
 
       - name: Upload IPA artifact (backup)
         uses: actions/upload-artifact@v4
