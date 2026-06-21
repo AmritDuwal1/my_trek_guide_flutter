@@ -221,8 +221,10 @@ jobs:
             echo "::error::APPSTORE_ISSUER_ID, APPSTORE_API_KEY_ID, and APPSTORE_API_PRIVATE_KEY are required."
             exit 1
           fi
-          python3 -m pip install --quiet pyjwt cryptography
-          python3 <<'PY'
+          python3 -m venv "$RUNNER_TEMP/asc-venv"
+          source "$RUNNER_TEMP/asc-venv/bin/activate"
+          pip install --quiet pyjwt cryptography
+          python <<'PY'
           import json, os, time, urllib.error, urllib.request
           import jwt
 
