@@ -275,7 +275,7 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          backend: transporter
+          backend: appstore-api
           uses-non-exempt-encryption: "false"
           wait-for-processing: "false"
 
