@@ -73,11 +73,19 @@ jobs:
   #         retention-days: 14
 
   build-ios-simulator:
-    runs-on: macos-latest
+    runs-on: macos-26
     needs: analyze-and-test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$XCODE_APP" ]; then
+            sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+            xcodebuild -version
+          fi
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2

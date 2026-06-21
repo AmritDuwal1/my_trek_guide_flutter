@@ -36,10 +36,23 @@ env:
 
 jobs:
   release-testflight:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "ERROR: Xcode 26 not found on runner."
+            ls /Applications
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -208,6 +221,15 @@ jobs:
           if [ "$BUNDLE_ID" != "$IOS_BUNDLE_ID" ]; then
             echo "::error::IPA bundle ID is '$BUNDLE_ID' but expected '$IOS_BUNDLE_ID'."
             exit 1
+          fi
+          APP_FRAMEWORK="$APP/Frameworks/App.framework/Info.plist"
+          if [ -f "$APP_FRAMEWORK" ]; then
+            MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print MinimumOSVersion' "$APP_FRAMEWORK" 2>/dev/null || echo "")
+            echo "App.framework MinimumOSVersion: ${MIN_OS:-MISSING}"
+            if [ -z "$MIN_OS" ]; then
+              echo "::error::App.framework is missing MinimumOSVersion (ITMS-90360)."
+              exit 1
+            fi
           fi
           codesign -dvvv "$APP" 2>&1 | grep -E 'Authority=|TeamIdentifier=|Identifier=' || true
 
